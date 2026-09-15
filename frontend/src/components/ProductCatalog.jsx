@@ -1,32 +1,57 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { products, cart } from '../services/customerApi';
+import { useAlert } from '../context/AlertContext';
+import CustomerNavbar from './common/CustomerNavbar';
 
 const ProductCatalog = () => {
+  const { showAlert, showConfirm } = useAlert();
   const [productList, setProductList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Advanced Filters
   const [filters, setFilters] = useState({
     type: '',
-    company: '',
+    category: '',
     minPrice: '',
     maxPrice: '',
     sort: 'name'
   });
-  const [categories, setCategories] = useState([]);
+  
+  const [categories, setCategories] = useState([
+    'Pain Relief', 'Cold & Cough', 'Allergy & Sinus', 
+    'Digestive Health', 'Vitamins & Supplements', 
+    'Heart & Blood Pressure', 'Diabetes Care', 
+    'Skin Care', 'First Aid', 'Oral Care'
+  ]); // Pre-loaded common categories for the UI
+  
   const [pagination, setPagination] = useState({
     page: 1,
     pages: 1,
     total: 0
   });
   const [cartCount, setCartCount] = useState(0);
+  const [addingState, setAddingState] = useState({});
+  const [imageErrors, setImageErrors] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchProducts();
-    fetchCategories();
     fetchCartCount();
-  }, [filters, pagination.page, searchTerm]);
+  }, [filters, pagination.page]);
+
+  // Debounced search
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (pagination.page !== 1) {
+        setPagination(prev => ({ ...prev, page: 1 }));
+      } else {
+        fetchProducts();
+      }
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
 
   const fetchProducts = async () => {
     try {
@@ -34,7 +59,7 @@ const ProductCatalog = () => {
       const params = {
         search: searchTerm,
         type: filters.type,
-        company: filters.company,
+        category: filters.category,
         min_price: filters.minPrice,
         max_price: filters.maxPrice,
         sort: filters.sort,
@@ -52,15 +77,6 @@ const ProductCatalog = () => {
     }
   };
 
-  const fetchCategories = async () => {
-    try {
-      const response = await products.getCategories();
-      setCategories(response.data);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-    }
-  };
-
   const fetchCartCount = async () => {
     try {
       const response = await cart.getCount();
@@ -70,291 +86,370 @@ const ProductCatalog = () => {
     }
   };
 
-  const handleAddToCart = async (productId) => {
+  const handleAddToCart = async (e, productId) => {
+    e.stopPropagation(); // Prevent card click
+    
+    const token = localStorage.getItem('customerToken');
+    if (!token) {
+      showAlert({ type: 'warning', message: 'Please login to add items to cart' });
+      navigate('/customer/login');
+      return;
+    }
+
     try {
+      setAddingState(prev => ({ ...prev, [productId]: 'adding' }));
+      
       await cart.add({ medicine_id: productId, quantity: 1 });
       fetchCartCount();
-      // Show success message
-      alert('Added to cart!');
+      window.dispatchEvent(new Event('cartUpdated'));
+      
+      setAddingState(prev => ({ ...prev, [productId]: 'added' }));
+      
+      setTimeout(() => {
+        setAddingState(prev => {
+          const newState = { ...prev };
+          delete newState[productId];
+          return newState;
+        });
+      }, 2000);
+      
     } catch (error) {
-      alert(error.response?.data?.message || 'Failed to add to cart');
+      setAddingState(prev => {
+        const newState = { ...prev };
+        delete newState[productId];
+        return newState;
+      });
+      showAlert({ type: 'error', message: error.response?.data?.message || 'Failed to add to cart' });
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('customerToken');
-    localStorage.removeItem('customer');
-    navigate('/customer/login');
+  const handleLogout = async () => {
+    const confirmed = await showConfirm('Are you sure you want to logout from Medi-Flow?', 'Confirm Logout', 'Logout');
+    if (confirmed) {
+      localStorage.removeItem('customerToken');
+      localStorage.removeItem('customer');
+      navigate('/customer/login');
+    }
   };
 
   const customer = JSON.parse(localStorage.getItem('customer') || '{}');
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <Link to="/shop" className="flex items-center">
-                <img 
-                  src="/logo.png" 
-                  alt="Medi-Flow" 
-                  className="h-10 w-auto"
-                  onError={(e) => e.target.style.display = 'none'}
-                />
-                <span className="ml-2 text-xl font-bold text-indigo-600">Medi-Flow</span>
-              </Link>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              <Link to="/customer/orders" className="text-gray-700 hover:text-indigo-600">
-                My Orders
-              </Link>
-              <Link to="/cart" className="relative">
-                <svg className="h-6 w-6 text-gray-700 hover:text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-                {cartCount > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {cartCount}
-                  </span>
-                )}
-              </Link>
-              <div className="relative group">
-                <button className="flex items-center text-gray-700 hover:text-indigo-600">
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  <span className="ml-2">{customer.name}</span>
-                </button>
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg hidden group-hover:block">
-                  <Link to="/customer/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                    Profile
-                  </Link>
-                  <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                    Logout
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+  const ProductSkeleton = () => (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden animate-pulse">
+      <div className="w-full aspect-square bg-slate-100"></div>
+      <div className="p-5">
+        <div className="h-4 bg-slate-200 rounded w-1/3 mb-3"></div>
+        <div className="h-6 bg-slate-200 rounded w-3/4 mb-2"></div>
+        <div className="h-4 bg-slate-200 rounded w-1/2 mb-4"></div>
+        <div className="flex justify-between items-end mt-6">
+          <div className="h-6 bg-slate-200 rounded w-1/3"></div>
+          <div className="h-10 bg-slate-200 rounded-lg w-1/3"></div>
         </div>
-      </nav>
+      </div>
+    </div>
+  );
 
-      {/* Search and Filters */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Search */}
-            <div className="md:col-span-2">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search medicines..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+      {/* Navigation */}
+      <CustomerNavbar />
+
+      {/* Hero Search Section */}
+      <div className="bg-white border-b border-slate-200 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl">
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-4">Shop Pharmacy Essentials</h1>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
-            </div>
-
-            {/* Product Type Filter */}
-            <div>
-              <select
-                value={filters.type}
-                onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">All Types</option>
-                <option value="OTC">Over-the-Counter</option>
-                <option value="Rx">Prescription Only</option>
-              </select>
-            </div>
-
-            {/* Company Filter */}
-            <div>
-              <select
-                value={filters.company}
-                onChange={(e) => setFilters({ ...filters, company: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">All Companies</option>
-                {categories.map(cat => (
-                  <option key={cat.company_id} value={cat.company_id}>
-                    {cat.name} ({cat.product_count})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Additional Filters */}
-          <div className="mt-4 flex flex-wrap gap-4 items-center">
-            <div className="flex items-center space-x-2">
-              <label className="text-sm text-gray-600">Sort:</label>
-              <select
-                value={filters.sort}
-                onChange={(e) => setFilters({ ...filters, sort: e.target.value })}
-                className="px-3 py-1 border border-gray-300 rounded-lg text-sm"
-              >
-                <option value="name">Name</option>
-                <option value="price_asc">Price: Low to High</option>
-                <option value="price_desc">Price: High to Low</option>
-              </select>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <label className="text-sm text-gray-600">Price Range:</label>
               <input
-                type="number"
-                placeholder="Min"
-                value={filters.minPrice}
-                onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
-                className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-sm"
-              />
-              <span className="text-gray-500">-</span>
-              <input
-                type="number"
-                placeholder="Max"
-                value={filters.maxPrice}
-                onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
-                className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-sm"
+                type="text"
+                placeholder="Search for medicines, generics, or categories..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="block w-full pl-12 pr-4 py-4 border-2 border-slate-200 rounded-2xl text-base text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-0 focus:border-primary-500 transition-colors shadow-sm"
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Products Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-900">
-            {searchTerm ? `Search results for "${searchTerm}"` : 'All Medicines'}
-          </h2>
-          <p className="text-gray-600">
-            {pagination.total} products found
-          </p>
-        </div>
-
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-          </div>
-        ) : productList.length === 0 ? (
-          <div className="text-center py-12">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No products found</h3>
-            <p className="mt-1 text-sm text-gray-500">Try adjusting your search or filters</p>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {productList.map(product => (
-                <div key={product.medicine_id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition duration-300">
-                  <div className="relative">
-                    <img
-                      src={product.image_url}
-                      alt={product.name}
-                      className="w-full h-48 object-cover"
-                      onError={(e) => {
-                        e.target.src = 'https://via.placeholder.com/300x200?text=Medicine';
-                      }}
-                    />
-                    {/* OTC/Rx Badge */}
-                    <div className="absolute top-2 right-2">
-                      {product.product_type === 'Rx' ? (
-                        <span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center">
-                          <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          Rx Required
-                        </span>
-                      ) : (
-                        <span className="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                          OTC
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1 truncate">
-                      {product.name}
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-2">{product.company}</p>
-                    
-                    {product.description && (
-                      <p className="text-sm text-gray-500 mb-3 line-clamp-2">
-                        {product.description}
-                      </p>
-                    )}
-
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-2xl font-bold text-indigo-600">
-                        ₹{product.price}
-                      </span>
-                      {product.in_stock ? (
-                        <span className="text-xs text-green-600 font-medium">In Stock</span>
-                      ) : (
-                        <span className="text-xs text-red-600 font-medium">Out of Stock</span>
-                      )}
-                    </div>
-
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => navigate(`/product/${product.medicine_id}`)}
-                        className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition duration-150 text-sm font-medium"
-                      >
-                        View Details
-                      </button>
-                      <button
-                        onClick={() => handleAddToCart(product.medicine_id)}
-                        disabled={!product.in_stock}
-                        className="flex-1 bg-gradient-to-r from-green-500 to-blue-600 text-white py-2 px-4 rounded-lg hover:from-green-600 hover:to-blue-700 transition duration-150 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Add to Cart
-                      </button>
-                    </div>
+      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        <div className="flex flex-col lg:flex-row gap-8">
+          
+          {/* Sidebar Filters */}
+          <aside className="w-full lg:w-64 flex-shrink-0">
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 sticky top-24">
+              <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>
+                Filters
+              </h2>
+              
+              <div className="space-y-8">
+                {/* Product Type */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Prescription</h3>
+                  <div className="space-y-2">
+                    <label className="flex items-center cursor-pointer group">
+                      <input 
+                        type="radio" 
+                        name="type" 
+                        checked={filters.type === ''} 
+                        onChange={() => setFilters({...filters, type: ''})}
+                        className="form-radio h-4 w-4 text-primary-600 border-slate-300 focus:ring-primary-500"
+                      />
+                      <span className="ml-3 text-sm text-slate-600 group-hover:text-slate-900">All Items</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer group">
+                      <input 
+                        type="radio" 
+                        name="type" 
+                        checked={filters.type === 'OTC'} 
+                        onChange={() => setFilters({...filters, type: 'OTC'})}
+                        className="form-radio h-4 w-4 text-primary-600 border-slate-300 focus:ring-primary-500"
+                      />
+                      <span className="ml-3 text-sm text-slate-600 group-hover:text-slate-900">Over The Counter</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer group">
+                      <input 
+                        type="radio" 
+                        name="type" 
+                        checked={filters.type === 'Rx'} 
+                        onChange={() => setFilters({...filters, type: 'Rx'})}
+                        className="form-radio h-4 w-4 text-primary-600 border-slate-300 focus:ring-primary-500"
+                      />
+                      <span className="ml-3 text-sm text-slate-600 group-hover:text-slate-900">Prescription Required</span>
+                    </label>
                   </div>
                 </div>
-              ))}
+
+                {/* Categories */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Categories</h3>
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                    <label className="flex items-center cursor-pointer group">
+                      <input 
+                        type="radio" 
+                        name="category" 
+                        checked={filters.category === ''} 
+                        onChange={() => setFilters({...filters, category: ''})}
+                        className="form-radio h-4 w-4 text-primary-600 border-slate-300 focus:ring-primary-500"
+                      />
+                      <span className="ml-3 text-sm text-slate-600 group-hover:text-slate-900">All Categories</span>
+                    </label>
+                    {categories.map(cat => (
+                      <label key={cat} className="flex items-center cursor-pointer group">
+                        <input 
+                          type="radio" 
+                          name="category" 
+                          checked={filters.category === cat} 
+                          onChange={() => setFilters({...filters, category: cat})}
+                          className="form-radio h-4 w-4 text-primary-600 border-slate-300 focus:ring-primary-500"
+                        />
+                        <span className="ml-3 text-sm text-slate-600 group-hover:text-slate-900">{cat}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sort */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Sort By</h3>
+                  <select 
+                    value={filters.sort}
+                    onChange={(e) => setFilters({...filters, sort: e.target.value})}
+                    className="block w-full pl-3 pr-10 py-2 text-sm border-slate-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 rounded-lg shadow-sm"
+                  >
+                    <option value="name">Name (A-Z)</option>
+                    <option value="price_asc">Price (Low to High)</option>
+                    <option value="price_desc">Price (High to Low)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          {/* Product Grid */}
+          <div className="flex-1">
+            
+            {/* Header info */}
+            <div className="flex justify-between items-center mb-6">
+              <p className="text-sm text-slate-500">
+                Showing <strong className="text-slate-900">{productList.length}</strong> items 
+                {filters.category && <span> in <strong className="text-slate-900">{filters.category}</strong></span>}
+              </p>
             </div>
 
-            {/* Pagination */}
-            {pagination.pages > 1 && (
-              <div className="mt-8 flex justify-center">
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                  <button
-                    onClick={() => setPagination({ ...pagination, page: pagination.page - 1 })}
-                    disabled={!pagination.has_prev}
-                    className="relative inline-flex items-center px-4 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            {loading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                {[...Array(8)].map((_, i) => (
+                  <ProductSkeleton key={i} />
+                ))}
+              </div>
+            ) : productList.length === 0 ? (
+              <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-sm">
+                <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg className="h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">No medicines found</h3>
+                <p className="text-slate-500 mb-6 max-w-md mx-auto">
+                  We couldn't find any products matching your search or filter criteria. Try adjusting your filters.
+                </p>
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setFilters({ type: '', category: '', minPrice: '', maxPrice: '', sort: 'name' });
+                  }}
+                  className="inline-flex items-center px-6 py-3 border border-slate-300 shadow-sm text-sm font-medium rounded-xl text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                {productList.map((product) => (
+                  <div 
+                    key={product.medicine_id} 
+                    onClick={() => navigate(`/product/${product.medicine_id}`)}
+                    className="group bg-white rounded-2xl shadow-sm hover:shadow-xl border border-slate-100 overflow-hidden transition-all duration-300 hover:-translate-y-1 cursor-pointer flex flex-col h-full"
                   >
-                    Previous
-                  </button>
-                  
-                  <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                    Page {pagination.page} of {pagination.pages}
-                  </span>
-                  
-                  <button
-                    onClick={() => setPagination({ ...pagination, page: pagination.page + 1 })}
-                    disabled={!pagination.has_next}
-                    className="relative inline-flex items-center px-4 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </nav>
+                    {/* Image Container */}
+                    <div className="relative aspect-square bg-slate-50 overflow-hidden border-b border-slate-100 flex items-center justify-center">
+                      {(!product.image_url || imageErrors[product.medicine_id]) ? (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 bg-slate-50/50">
+                          <svg className="h-16 w-16 mb-2 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                          </svg>
+                        </div>
+                      ) : (
+                        <img 
+                          src={product.image_url?.startsWith('/uploads') ? `http://localhost:5000${product.image_url}` : product.image_url} 
+                          alt={product.name}
+                          className="absolute inset-0 w-full h-full object-contain p-6 mix-blend-multiply group-hover:scale-110 transition-transform duration-500 ease-out"
+                          onError={() => setImageErrors(prev => ({ ...prev, [product.medicine_id]: true }))}
+                        />
+                      )}
+                      
+                      {/* Badges */}
+                      <div className="absolute top-3 left-3 flex flex-col gap-2">
+                        {product.requires_prescription ? (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-100/90 text-purple-700 backdrop-blur-sm border border-purple-200 shadow-sm">
+                            Rx Only
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-100/90 text-emerald-700 backdrop-blur-sm border border-emerald-200 shadow-sm">
+                            OTC
+                          </span>
+                        )}
+                        {!product.in_stock && (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-red-100/90 text-red-700 backdrop-blur-sm border border-red-200 shadow-sm">
+                            Out of Stock
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Content Container */}
+                    <div className="p-5 flex flex-col flex-grow">
+                      <div className="mb-1">
+                        <span className="text-xs font-bold text-primary-600 uppercase tracking-wider">
+                          {product.category || 'Medicine'}
+                        </span>
+                      </div>
+                      
+                      <h3 className="text-lg font-bold text-slate-900 mb-1 leading-tight line-clamp-1 group-hover:text-primary-600 transition-colors">
+                        {product.name}
+                      </h3>
+                      
+                      <p className="text-xs text-slate-500 mb-4 font-medium">
+                        {product.company}
+                      </p>
+
+                      <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-slate-400 font-medium mb-0.5">Price</p>
+                          <p className="text-xl font-black text-slate-900">₹{product.price.toFixed(2)}</p>
+                        </div>
+                        
+                        <button
+                          onClick={(e) => handleAddToCart(e, product.medicine_id)}
+                          disabled={!product.in_stock || addingState[product.medicine_id] === 'adding' || addingState[product.medicine_id] === 'added'}
+                          className={`flex-shrink-0 inline-flex items-center justify-center h-10 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
+                            !product.in_stock
+                              ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                              : addingState[product.medicine_id] === 'added'
+                              ? 'bg-emerald-500 text-white shadow-sm'
+                              : 'bg-slate-900 text-white hover:bg-primary-600 shadow-sm hover:shadow group-hover:bg-primary-600'
+                          }`}
+                        >
+                          {addingState[product.medicine_id] === 'added' ? (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : addingState[product.medicine_id] === 'adding' ? (
+                            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          ) : (
+                            'Add'
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
-          </>
-        )}
-      </div>
+
+            {/* Pagination Controls */}
+            {pagination.pages > 1 && (
+              <div className="mt-10 flex items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6 rounded-2xl shadow-sm border">
+                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-slate-700">
+                      Showing page <span className="font-bold">{pagination.page}</span> of{' '}
+                      <span className="font-bold">{pagination.pages}</span>
+                    </p>
+                  </div>
+                  <div>
+                    <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                      <button
+                        onClick={() => setPagination(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+                        disabled={pagination.page === 1}
+                        className="relative inline-flex items-center rounded-l-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                      >
+                        <span className="sr-only">Previous</span>
+                        <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => setPagination(prev => ({ ...prev, page: Math.min(prev.pages, prev.page + 1) }))}
+                        disabled={pagination.page === pagination.pages}
+                        className="relative inline-flex items-center rounded-r-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                      >
+                        <span className="sr-only">Next</span>
+                        <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </nav>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+          </div>
+        </div>
+      </main>
     </div>
   );
 };

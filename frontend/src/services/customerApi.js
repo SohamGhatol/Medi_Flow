@@ -68,6 +68,7 @@ export const orders = {
   },
   getAll: () => customerApi.get('/customer/orders'),
   getById: (id) => customerApi.get(`/customer/orders/${id}`),
+  getOcr: (id) => customerApi.get(`/customer/orders/${id}/ocr`),
   track: (id) => customerApi.get(`/customer/orders/${id}/track`),
   cancel: (id) => customerApi.post(`/customer/orders/${id}/cancel`)
 };

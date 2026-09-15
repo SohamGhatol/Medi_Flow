@@ -3,6 +3,8 @@ from models.medicine import Medicine, Company, db
 from models.user import User
 from routes.auth_routes import token_required, role_required
 from datetime import datetime, timedelta
+import os
+from werkzeug.utils import secure_filename
 
 medicine_bp = Blueprint('medicines', __name__)
 
@@ -37,6 +39,10 @@ def get_medicines(current_user):
             result.append({
                 'medicine_id': med.medicine_id,
                 'name': med.name,
+                'generic_name': med.generic_name,
+                'category': med.category,
+                'dosage_form': med.dosage_form,
+                'strength': med.strength,
                 'company': med.company.name,
                 'batch_no': med.batch_no,
                 'mfg_date': med.mfg_date.isoformat(),
@@ -44,6 +50,8 @@ def get_medicines(current_user):
                 'quantity': med.quantity,
                 'min_stock': med.min_stock,
                 'price': float(med.price),
+                'product_type': med.product_type,
+                'image_url': med.image_url,
                 'days_to_expiry': (med.exp_date - datetime.now().date()).days
             })
         
@@ -63,6 +71,10 @@ def get_medicine(current_user, id):
         return jsonify({
             'medicine_id': medicine.medicine_id,
             'name': medicine.name,
+            'generic_name': medicine.generic_name,
+            'category': medicine.category,
+            'dosage_form': medicine.dosage_form,
+            'strength': medicine.strength,
             'company_id': medicine.company_id,
             'company': medicine.company.name,
             'batch_no': medicine.batch_no,
@@ -70,7 +82,10 @@ def get_medicine(current_user, id):
             'exp_date': medicine.exp_date.isoformat(),
             'quantity': medicine.quantity,
             'min_stock': medicine.min_stock,
-            'price': float(medicine.price)
+            'price': float(medicine.price),
+            'product_type': medicine.product_type,
+            'description': medicine.description,
+            'image_url': medicine.image_url
         }), 200
     except Exception as e:
         return jsonify({'message': 'Error retrieving medicine', 'error': str(e)}), 500
@@ -119,7 +134,14 @@ def create_medicine(current_user):
             exp_date=datetime.strptime(data['exp_date'], '%Y-%m-%d').date(),
             quantity=data['quantity'],
             min_stock=data.get('min_stock', 10),
-            price=data['price']
+            price=data['price'],
+            category=data.get('category', 'Uncategorized'),
+            generic_name=data.get('generic_name'),
+            dosage_form=data.get('dosage_form'),
+            strength=data.get('strength'),
+            product_type=data.get('product_type', 'OTC'),
+            description=data.get('description'),
+            image_url=data.get('image_url')
         )
         
         db.session.add(new_medicine)
@@ -179,12 +201,94 @@ def update_medicine(current_user, id):
         if 'price' in data:
             medicine.price = data['price']
         
+        # New Pharmacy fields
+        if 'category' in data:
+            medicine.category = data['category']
+        if 'generic_name' in data:
+            medicine.generic_name = data['generic_name']
+        if 'dosage_form' in data:
+            medicine.dosage_form = data['dosage_form']
+        if 'strength' in data:
+            medicine.strength = data['strength']
+        if 'product_type' in data:
+            medicine.product_type = data['product_type']
+        if 'description' in data:
+            medicine.description = data['description']
+        if 'image_url' in data:
+            medicine.image_url = data['image_url']
+        
         db.session.commit()
         
         return jsonify({'message': 'Medicine updated successfully'}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': 'Error updating medicine', 'error': str(e)}), 500
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'avif'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@medicine_bp.route('/<int:id>/image', methods=['POST'])
+@token_required
+@role_required('Admin')
+def upload_medicine_image(current_user, id):
+    """Upload a medicine image (Admin only)"""
+    try:
+        medicine = Medicine.query.get(id)
+        if not medicine:
+            return jsonify({'message': 'Medicine not found'}), 404
+
+        if 'image' not in request.files:
+            return jsonify({'message': 'No image file provided'}), 400
+            
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({'message': 'No selected file'}), 400
+            
+        if not allowed_file(file.filename):
+            return jsonify({'message': 'Invalid file type. Allowed: PNG, JPG, JPEG, WEBP, AVIF'}), 400
+            
+        # File size check happens in werkzeug but we can also enforce it in config or check it here
+        # (Assuming config MAX_CONTENT_LENGTH handles it globally or we trust the frontend mostly for this specific API)
+            
+        # Create safe filename
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        filename = secure_filename(f"medicine_{id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}")
+        
+        # Ensure directory exists
+        upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads', 'medicines')
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Save file
+        file_path = os.path.join(upload_dir, filename)
+        file.save(file_path)
+        
+        # Generate URL
+        image_url = f"/uploads/medicines/{filename}"
+        
+        # Clean up old image if it exists and is local
+        if medicine.image_url and medicine.image_url.startswith('/uploads/medicines/'):
+            old_filename = medicine.image_url.split('/')[-1]
+            old_file_path = os.path.join(upload_dir, old_filename)
+            if os.path.exists(old_file_path):
+                try:
+                    os.remove(old_file_path)
+                except Exception as e:
+                    print(f"Failed to remove old image: {e}")
+        
+        # Update database
+        medicine.image_url = image_url
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Image uploaded successfully',
+            'image_url': image_url
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': 'Error uploading image', 'error': str(e)}), 500
 
 @medicine_bp.route('/<int:id>', methods=['DELETE'])
 @token_required

@@ -1,7 +1,9 @@
 from flask import Blueprint, request, jsonify, send_file
+from sqlalchemy import or_
 from models.order import Order, OrderItem, OrderStatusHistory, db
 from models.customer import Customer
 from models.user import User
+from models.prescription_ocr import PrescriptionOCRResult, PrescriptionMedicineExtraction
 from routes.auth_routes import token_required, role_required
 from datetime import datetime
 import os
@@ -16,11 +18,32 @@ def get_online_orders(current_user):
         # Get query parameters
         status = request.args.get('status')
         requires_review = request.args.get('requires_review', type=bool)
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        search_query = request.args.get('search')
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
         
         # Build query
         query = Order.query
+        
+        if start_date:
+            try:
+                # Assuming start_date is YYYY-MM-DD
+                parsed_start = datetime.strptime(start_date, '%Y-%m-%d')
+                query = query.filter(Order.order_date >= parsed_start)
+            except ValueError:
+                pass
+                
+        if end_date:
+            try:
+                # Set time to end of day
+                parsed_end = datetime.strptime(end_date, '%Y-%m-%d')
+                parsed_end = parsed_end.replace(hour=23, minute=59, second=59)
+                query = query.filter(Order.order_date <= parsed_end)
+            except ValueError:
+                pass
+        
         
         if status:
             query = query.filter(Order.status == status)
@@ -30,6 +53,25 @@ def get_online_orders(current_user):
                 Order.requires_prescription == True,
                 Order.prescription_status == 'Pending'
             )
+            
+        if search_query:
+            # Check if search_query is an integer for order_id
+            try:
+                order_id_search = int(search_query)
+                query = query.join(Customer).filter(
+                    or_(
+                        Order.order_id == order_id_search,
+                        Customer.name.ilike(f'%{search_query}%'),
+                        Customer.email.ilike(f'%{search_query}%')
+                    )
+                )
+            except ValueError:
+                query = query.join(Customer).filter(
+                    or_(
+                        Customer.name.ilike(f'%{search_query}%'),
+                        Customer.email.ilike(f'%{search_query}%')
+                    )
+                )
         
         # Order by date (newest first)
         query = query.order_by(Order.order_date.desc())
@@ -55,6 +97,7 @@ def get_online_orders(current_user):
                 'requires_prescription': order.requires_prescription,
                 'prescription_uploaded': order.prescription_uploaded,
                 'prescription_status': order.prescription_status,
+                'prescription_file_path': order.prescription_file_path,
                 'needs_review': order.requires_prescription and order.prescription_status == 'Pending'
             })
         
@@ -220,7 +263,63 @@ def review_prescription(current_user, order_id):
         db.session.rollback()
         return jsonify({'message': 'Error reviewing prescription', 'error': str(e)}), 500
 
-@staff_order_bp.route('/online-orders/<int:order_id>/update-status', methods=['PUT'])
+@staff_order_bp.route('/online-orders/<int:order_id>/ocr', methods=['GET'])
+@token_required
+def get_ocr_results(current_user, order_id):
+    """Get the OCR results for a prescription order"""
+    try:
+        ocr_result = PrescriptionOCRResult.query.filter_by(order_id=order_id).order_by(PrescriptionOCRResult.created_at.desc()).first()
+        
+        if not ocr_result:
+            return jsonify({'message': 'No OCR result found for this order', 'status': 'NOT_PROCESSED'}), 200
+            
+        extractions = PrescriptionMedicineExtraction.query.filter_by(ocr_result_id=ocr_result.id).all()
+        
+        extraction_data = []
+        for ext in extractions:
+            extraction_data.append({
+                'id': ext.id,
+                'medicine_id': ext.medicine_id,
+                'extracted_name': ext.extracted_name,
+                'extracted_strength': ext.extracted_strength,
+                'extracted_dosage': ext.extracted_dosage,
+                'extracted_duration': ext.extracted_duration,
+                'confidence_score': ext.confidence_score,
+                'match_status': ext.match_status
+            })
+            
+        return jsonify({
+            'status': ocr_result.processing_status,
+            'raw_text': ocr_result.raw_ocr_text,
+            'overall_confidence': ocr_result.overall_confidence,
+            'extractions': extraction_data,
+            'processed_at': ocr_result.updated_at.isoformat()
+        }), 200
+    except Exception as e:
+        return jsonify({'message': 'Error retrieving OCR results', 'error': str(e)}), 500
+
+@staff_order_bp.route('/online-orders/<int:order_id>/ocr/confirm', methods=['POST'])
+@token_required
+def confirm_ocr_results(current_user, order_id):
+    """Confirm or update OCR extractions (Manual Verification)"""
+    data = request.json
+    try:
+        ocr_result = PrescriptionOCRResult.query.filter_by(order_id=order_id).order_by(PrescriptionOCRResult.created_at.desc()).first()
+        if not ocr_result:
+            return jsonify({'message': 'OCR result not found'}), 404
+            
+        # Optional: Save modifications sent by staff.
+        # For simplicity, we just mark it VERIFIED.
+        ocr_result.processing_status = 'VERIFIED'
+        db.session.commit()
+        
+        return jsonify({'message': 'OCR results verified successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': 'Error verifying OCR results', 'error': str(e)}), 500
+
+# Update Order Status (General)
+@staff_order_bp.route('/online-orders/<int:order_id>/status', methods=['PUT'])
 @token_required
 def update_order_status(current_user, order_id):
     """Update order status"""
@@ -229,11 +328,8 @@ def update_order_status(current_user, order_id):
         
         if 'status' not in data:
             return jsonify({'message': 'Status required'}), 400
-        
-        valid_statuses = ['Pending Review', 'Approved', 'Processing', 'Out for Delivery', 'Delivered', 'Rejected', 'Cancelled']
-        
-        if data['status'] not in valid_statuses:
-            return jsonify({'message': f'Invalid status. Must be one of: {", ".join(valid_statuses)}'}), 400
+        if not data['status'] or len(data['status']) > 20:
+            return jsonify({'message': 'Status is required and must be under 20 characters'}), 400
         
         order = Order.query.get(order_id)
         

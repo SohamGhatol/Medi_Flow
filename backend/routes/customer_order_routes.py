@@ -2,10 +2,13 @@ from flask import Blueprint, request, jsonify
 from models.customer import Customer, CartItem, db
 from models.medicine import Medicine
 from models.order import Order, OrderItem, OrderStatusHistory
+from ocr_engine import process_prescription_ocr
 from routes.customer_auth_routes import customer_token_required
+from services.inventory_service import InventoryService
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import os
+import threading
 
 customer_order_bp = Blueprint('customer_orders', __name__)
 
@@ -32,18 +35,12 @@ def validate_checkout(current_customer):
         for item in cart_items:
             medicine = item.medicine
             
-            # Check availability
-            if medicine.quantity < item.quantity:
+            # Check available valid stock
+            available_stock = InventoryService.get_available_stock(medicine.medicine_id)
+            if available_stock < item.quantity:
                 issues.append({
                     'medicine': medicine.name,
-                    'issue': f'Only {medicine.quantity} units available, but {item.quantity} requested'
-                })
-            
-            # Check expiry
-            if medicine.exp_date <= datetime.now().date():
-                issues.append({
-                    'medicine': medicine.name,
-                    'issue': 'Medicine has expired'
+                    'issue': f'Only {available_stock} valid units available, but {item.quantity} requested'
                 })
             
             # Check if prescription required
@@ -92,14 +89,6 @@ def place_order(current_customer):
         
         for item in cart_items:
             medicine = item.medicine
-            
-            # Final availability check
-            if medicine.quantity < item.quantity:
-                return jsonify({'message': f'Insufficient stock for {medicine.name}'}), 400
-            
-            if medicine.exp_date <= datetime.now().date():
-                return jsonify({'message': f'{medicine.name} has expired'}), 400
-            
             subtotal = float(medicine.price) * item.quantity
             total += subtotal
             
@@ -192,6 +181,13 @@ def place_order(current_customer):
         )
         db.session.add(status_history)
         
+        # Trigger OCR asynchronously if a prescription was uploaded
+        if prescription_file_path:
+            threading.Thread(
+                target=process_prescription_ocr,
+                args=(new_order.order_id, prescription_file_path)
+            ).start()
+        
         # Clear cart
         CartItem.query.filter_by(customer_id=current_customer.customer_id).delete()
         
@@ -240,39 +236,33 @@ def get_orders(current_customer):
 
 @customer_order_bp.route('/orders/<int:order_id>', methods=['GET'])
 @customer_token_required
-def get_order_detail(current_customer, order_id):
-    """Get detailed order information"""
+def get_order_details(current_customer, order_id):
+    """Get specific order details"""
     try:
-        order = Order.query.filter_by(
-            order_id=order_id,
-            customer_id=current_customer.customer_id
-        ).first()
+        order = Order.query.filter_by(order_id=order_id, customer_id=current_customer.customer_id).first()
         
         if not order:
             return jsonify({'message': 'Order not found'}), 404
-        
-        # Get order items
+            
         items = []
         for item in order.order_items:
             items.append({
                 'medicine_id': item.medicine_id,
-                'name': item.medicine.name,
-                'company': item.medicine.company.name,
+                'name': Medicine.query.get(item.medicine_id).name,
                 'quantity': item.quantity,
                 'unit_price': float(item.unit_price),
                 'subtotal': float(item.subtotal),
                 'product_type': item.product_type
             })
-        
-        # Get status history
+            
         history = []
-        for status in order.status_history:
+        for h in order.status_history:
             history.append({
-                'status': status.status,
-                'changed_at': status.changed_at.isoformat(),
-                'notes': status.notes
+                'status': h.status,
+                'changed_at': h.changed_at.isoformat(),
+                'notes': h.notes
             })
-        
+            
         return jsonify({
             'order_id': order.order_id,
             'order_date': order.order_date.isoformat(),
@@ -287,12 +277,41 @@ def get_order_detail(current_customer, order_id):
             'prescription_uploaded': order.prescription_uploaded,
             'prescription_status': order.prescription_status,
             'items': items,
-            'status_history': history,
-            'staff_notes': order.staff_notes
+            'history': history
         }), 200
-        
     except Exception as e:
         return jsonify({'message': 'Error retrieving order', 'error': str(e)}), 500
+
+from models.prescription_ocr import PrescriptionOCRResult, PrescriptionMedicineExtraction
+
+@customer_order_bp.route('/orders/<int:order_id>/ocr', methods=['GET'])
+@customer_token_required
+def get_customer_ocr_results(current_customer, order_id):
+    """Get OCR results for customer's order"""
+    try:
+        order = Order.query.filter_by(order_id=order_id, customer_id=current_customer.customer_id).first()
+        if not order:
+            return jsonify({'message': 'Order not found'}), 404
+            
+        ocr_result = PrescriptionOCRResult.query.filter_by(order_id=order_id).order_by(PrescriptionOCRResult.created_at.desc()).first()
+        if not ocr_result:
+            return jsonify({'message': 'No OCR result', 'status': 'NOT_PROCESSED'}), 200
+            
+        extractions = PrescriptionMedicineExtraction.query.filter_by(ocr_result_id=ocr_result.id).all()
+        extraction_data = [{
+            'extracted_name': ext.extracted_name,
+            'extracted_strength': ext.extracted_strength,
+            'extracted_dosage': ext.extracted_dosage,
+            'extracted_duration': ext.extracted_duration,
+            'match_status': ext.match_status
+        } for ext in extractions]
+            
+        return jsonify({
+            'status': ocr_result.processing_status,
+            'extractions': extraction_data
+        }), 200
+    except Exception as e:
+        return jsonify({'message': 'Error retrieving OCR', 'error': str(e)}), 500
 
 @customer_order_bp.route('/orders/<int:order_id>/track', methods=['GET'])
 @customer_token_required

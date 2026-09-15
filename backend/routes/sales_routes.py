@@ -1,7 +1,10 @@
 from flask import Blueprint, request, jsonify
 from models.sale import Sale, db
 from models.medicine import Medicine
+from models.order import Order, OrderItem
+from models.customer import Customer
 from routes.auth_routes import token_required, role_required
+from services.inventory_service import InventoryService, InsufficientStockError
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -20,21 +23,23 @@ def get_sales(current_user):
         end_date = request.args.get('end_date')
         medicine_id = request.args.get('medicine_id')
         
-        # Build query
-        query = Sale.query
-        
+        # Build query for POS Sales
+        sale_query = Sale.query
+
         if start_date:
             start = datetime.strptime(start_date, '%Y-%m-%d')
-            query = query.filter(Sale.date >= start)
+            sale_query = sale_query.filter(Sale.date >= start)
         
         if end_date:
             end = datetime.strptime(end_date, '%Y-%m-%d')
-            query = query.filter(Sale.date <= end)
+            # Set to end of day
+            end = end.replace(hour=23, minute=59, second=59)
+            sale_query = sale_query.filter(Sale.date <= end)
         
         if medicine_id:
-            query = query.filter(Sale.medicine_id == medicine_id)
+            sale_query = sale_query.filter(Sale.medicine_id == medicine_id)
         
-        sales = query.all()
+        sales = sale_query.order_by(Sale.date.desc()).all()
         
         result = []
         for sale in sales:
@@ -46,9 +51,10 @@ def get_sales(current_user):
                 'price': float(sale.price),
                 'total': float(sale.total),
                 'customer_name': sale.customer_name,
-                'date': sale.date.isoformat()
+                'date': sale.date.isoformat(),
+                'type': 'In-Store POS'
             })
-        
+            
         return jsonify(result), 200
     except Exception as e:
         return jsonify({'message': 'Error retrieving sales', 'error': str(e)}), 500
@@ -87,10 +93,21 @@ def create_sale(current_user):
             customer_name=data['customer_name']
         )
         
-        # Update medicine stock
-        medicine.quantity -= data['quantity']
-        
         db.session.add(new_sale)
+        db.session.flush() # Get sale_id
+        
+        # Update medicine stock using FEFO
+        try:
+            allocations = InventoryService.allocate_stock_fefo(
+                medicine_id=data['medicine_id'],
+                requested_qty=data['quantity'],
+                allocation_type='sale',
+                reference_id=new_sale.sale_id
+            )
+        except InsufficientStockError as e:
+            db.session.rollback()
+            return jsonify({'message': str(e)}), 400
+        
         db.session.commit()
         
         return jsonify({
@@ -145,8 +162,8 @@ def generate_invoice(current_user, id):
         pdf.drawString(100, height - 160, "-" * 50)
         pdf.drawString(100, height - 180, f"Item: {sale.medicine.name}")
         pdf.drawString(100, height - 200, f"Quantity: {sale.quantity}")
-        pdf.drawString(100, height - 220, f"Price: ${float(sale.price):.2f}")
-        pdf.drawString(100, height - 240, f"Total: ${float(sale.total):.2f}")
+        pdf.drawString(100, height - 220, f"Price: ₹{float(sale.price):.2f}")
+        pdf.drawString(100, height - 240, f"Total: ₹{float(sale.total):.2f}")
         
         pdf.save()
         

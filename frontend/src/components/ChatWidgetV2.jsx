@@ -1,9 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useAlert } from '../context/AlertContext';
 
 const API_URL = 'http://localhost:5000/api';
 
 const ChatWidgetV2 = () => {
+  const { showAlert } = useAlert();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
@@ -51,7 +53,7 @@ const ChatWidgetV2 = () => {
           if (line.includes('**')) {
             const cleanLine = line.replace(/\*\*/g, '');
             return (
-              <div key={index} className="font-semibold text-blue-700 text-sm">
+              <div key={index} className="font-semibold text-primary-700 text-sm">
                 {cleanLine}
               </div>
             );
@@ -60,7 +62,7 @@ const ChatWidgetV2 = () => {
           else if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
             return (
               <div key={index} className="flex items-start text-sm">
-                <span className="text-blue-500 mr-2">•</span>
+                <span className="text-primary-500 mr-2">•</span>
                 <span className="text-gray-700">{line.replace(/^[•\-]\s*/, '')}</span>
               </div>
             );
@@ -98,11 +100,11 @@ const ChatWidgetV2 = () => {
           </span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-lg font-bold text-blue-600">₹{product.price.toFixed(2)}</span>
+          <span className="text-lg font-bold text-primary-600">₹{product.price.toFixed(2)}</span>
           {customer_id && (
             <button
               onClick={() => handleAddToCart(product.medicine_id, product.name)}
-              className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-medium transition duration-150"
+              className="px-3 py-1 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-xs font-medium transition duration-150"
             >
               Add to Cart
             </button>
@@ -132,7 +134,7 @@ const ChatWidgetV2 = () => {
         </div>
         <div className="border-t pt-2 flex justify-between items-center">
           <span className="font-semibold text-gray-900">Total:</span>
-          <span className="text-lg font-bold text-blue-600">₹{cart.total.toFixed(2)}</span>
+          <span className="text-lg font-bold text-primary-600">₹{cart.total.toFixed(2)}</span>
         </div>
         <button
           onClick={() => window.location.href = '/checkout'}
@@ -168,7 +170,7 @@ const ChatWidgetV2 = () => {
         </div>
         <button
           onClick={() => window.location.href = `/customer/orders/${tracking.order_id}/track`}
-          className="w-full mt-3 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-medium transition duration-150"
+          className="w-full mt-3 px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-xs font-medium transition duration-150"
         >
           View Full Details
         </button>
@@ -178,9 +180,9 @@ const ChatWidgetV2 = () => {
 
   const renderFileUpload = (component) => {
     return (
-      <div className="border-2 border-dashed border-blue-300 rounded-lg p-4 bg-blue-50">
+      <div className="border-2 border-dashed border-primary-300 rounded-lg p-4 bg-primary-50">
         <div className="text-center">
-          <svg className="mx-auto h-12 w-12 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="mx-auto h-12 w-12 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
           <p className="mt-2 text-sm text-gray-700 font-medium">Upload Prescription</p>
@@ -195,7 +197,7 @@ const ChatWidgetV2 = () => {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadingFile}
-            className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition duration-150 disabled:opacity-50"
+            className="mt-3 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium transition duration-150 disabled:opacity-50"
           >
             {uploadingFile ? 'Uploading...' : 'Choose File'}
           </button>
@@ -210,13 +212,13 @@ const ChatWidgetV2 = () => {
 
     // Validate file size (5MB)
     if (file.size > 5242880) {
-      alert('File size must be less than 5MB');
+      showAlert({ type: 'warning', message: 'File size must be less than 5MB' });
       return;
     }
 
     const { token, customer_id } = getCustomerAuth();
     if (!customer_id) {
-      alert('Please login to upload prescription');
+      showAlert({ type: 'warning', message: 'Please login to upload prescription' });
       return;
     }
 
@@ -261,7 +263,7 @@ const ChatWidgetV2 = () => {
     const { token, customer_id } = getCustomerAuth();
     
     if (!customer_id) {
-      alert('Please login to add items to cart');
+      showAlert({ type: 'warning', message: 'Please login to add items to cart' });
       return;
     }
 
@@ -360,7 +362,7 @@ const ChatWidgetV2 = () => {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center z-50 group"
+          className="fixed bottom-6 right-6 w-16 h-16 bg-primary-600 rounded-full shadow-lg hover:bg-primary-700 hover:shadow-xl transition-all duration-300 flex items-center justify-center z-50 group"
         >
           <svg className="w-8 h-8 text-white group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -370,18 +372,18 @@ const ChatWidgetV2 = () => {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col z-50 animate-slideUp">
+        <div className="fixed bottom-0 right-0 w-full h-full sm:bottom-6 sm:right-6 sm:w-96 sm:h-[600px] bg-white sm:rounded-2xl shadow-2xl flex flex-col z-50 animate-slideUp">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-t-2xl flex justify-between items-center">
+          <div className="bg-primary-600 text-white p-4 sm:rounded-t-2xl flex justify-between items-center">
             <div className="flex items-center">
               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center mr-3">
-                <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-6 h-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                 </svg>
               </div>
               <div>
                 <h3 className="font-semibold">Shopping Assistant</h3>
-                <p className="text-xs text-blue-100">Online</p>
+                <p className="text-xs text-primary-100">Online</p>
               </div>
             </div>
             <button
@@ -395,10 +397,10 @@ const ChatWidgetV2 = () => {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
             {messages.map((message) => (
               <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] ${message.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-white text-gray-800'} rounded-2xl p-3 shadow-sm`}>
+                <div className={`max-w-[80%] ${message.sender === 'user' ? 'bg-primary-600 text-white' : 'bg-white text-gray-800'} rounded-2xl p-3 shadow-sm`}>
                   {message.formatted ? formatBotResponse(message.text) : <p className="text-sm">{message.text}</p>}
                   
                   {/* Render interactive components */}
@@ -426,7 +428,7 @@ const ChatWidgetV2 = () => {
                         <button
                           key={index}
                           onClick={() => handleSend(action.query)}
-                          className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium hover:bg-blue-200 transition-colors"
+                          className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-xs font-medium hover:bg-primary-200 transition-colors"
                         >
                           {action.label}
                         </button>
@@ -461,12 +463,12 @@ const ChatWidgetV2 = () => {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
               />
               <button
                 onClick={() => handleSend()}
                 disabled={!inputValue.trim()}
-                className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-primary-600 text-white p-2 rounded-full hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

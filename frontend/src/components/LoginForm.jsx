@@ -18,18 +18,18 @@ const LoginForm = () => {
     setError('');
     
     try {
-      const data = await authService.login(username, password);
+      const data = await authService.login(username.trim(), password);
       login(data.user, data.token);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message || 'Login failed');
+      setError(typeof err === 'string' ? err : err.message || 'Login failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 animate-fade-in">
         <div className="text-center">
           <div className="mx-auto mb-6 animate-slide-up">
@@ -43,14 +43,14 @@ const LoginForm = () => {
                 e.target.nextElementSibling.style.display = 'flex';
               }}
             />
-            <div className="hidden h-20 w-20 bg-white rounded-full items-center justify-center shadow-lg mx-auto">
-              <svg className="h-12 w-12 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="hidden h-20 w-20 bg-primary-100 rounded-full items-center justify-center shadow-inner mx-auto">
+              <svg className="h-10 w-10 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
             </div>
           </div>
-          <p className="mt-2 text-sm text-indigo-200">
-            Sign in to your account
+          <p className="mt-2 text-sm text-slate-600">
+            Sign in to your staff or admin account
           </p>
         </div>
         <form className="mt-8 space-y-6 bg-white rounded-2xl shadow-2xl p-8" onSubmit={handleSubmit}>
@@ -66,13 +66,13 @@ const LoginForm = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                 </div>
-                <input
+                  <input
                   id="username"
                   name="username"
                   type="text"
                   required
-                  className="appearance-none block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-150 ease-in-out sm:text-sm"
-                  placeholder="Enter your username"
+                  className="appearance-none block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-150 ease-in-out sm:text-sm"
+                  placeholder="Enter username (e.g. admin or staff)"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                 />
@@ -93,7 +93,7 @@ const LoginForm = () => {
                   name="password"
                   type="password"
                   required
-                  className="appearance-none block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-150 ease-in-out sm:text-sm"
+                  className="appearance-none block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition duration-150 ease-in-out sm:text-sm"
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -121,7 +121,7 @@ const LoginForm = () => {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transform transition duration-150 ease-in-out hover:scale-105 shadow-lg"
+              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out shadow"
             >
               {loading ? (
                 <>
@@ -142,14 +142,16 @@ const LoginForm = () => {
             </button>
           </div>
           
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 text-indigo-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 space-y-2">
+            <div className="flex items-start">
+              <svg className="h-5 w-5 text-indigo-600 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <div>
-                <p className="text-sm font-medium text-indigo-900">Demo Credentials</p>
-                <p className="text-xs text-indigo-700 mt-1">Username: <span className="font-semibold">admin</span> | Password: <span className="font-semibold">admin123</span></p>
+              <div className="text-xs text-indigo-900">
+                <p className="font-semibold text-sm mb-1">Available Staff & Admin Logins:</p>
+                <p>• Admin: <span className="font-mono font-bold">admin</span> / <span className="font-mono font-bold">admin123</span></p>
+                <p>• Staff: <span className="font-mono font-bold">staff</span> / <span className="font-mono font-bold">staff123</span></p>
+                <p>• Manager: <span className="font-mono font-bold">manager</span> / <span className="font-mono font-bold">manager123</span></p>
               </div>
             </div>
           </div>

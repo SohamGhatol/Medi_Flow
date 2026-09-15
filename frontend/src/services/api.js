@@ -8,6 +8,15 @@ const api = axios.create({
   },
 });
 
+export const onlineOrders = {
+  getAll: () => api.get('/online-orders'),
+  getById: (id) => api.get(`/online-orders/${id}`),
+  updateStatus: (id, status) => api.put(`/online-orders/${id}/status`, { status }),
+  reviewPrescription: (id, action) => api.post(`/online-orders/${id}/review-prescription`, { action }),
+  getOcr: (id) => api.get(`/online-orders/${id}/ocr`),
+  confirmOcr: (id) => api.post(`/online-orders/${id}/ocr/confirm`)
+};
+
 // Add a request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {

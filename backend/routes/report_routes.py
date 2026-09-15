@@ -1,12 +1,14 @@
 from flask import Blueprint, request, jsonify
 from models.medicine import Medicine, Company, db
 from models.sale import Sale
+from models.order import Order, OrderItem
 from models.purchase import Purchase
 from routes.auth_routes import token_required
 from datetime import datetime, timedelta
 from sqlalchemy import func
 import pandas as pd
 import io
+from services.dead_stock_service import DeadStockAnalyzer
 
 report_bp = Blueprint('reports', __name__)
 
@@ -63,30 +65,66 @@ def sales_summary(current_user):
         
         if period == 'daily':
             date_format = '%Y-%m-%d'
-            group_by = func.date_trunc('day', Sale.date)
+            sale_group_by = func.date_trunc('day', Sale.date)
+            order_group_by = func.date_trunc('day', Order.order_date)
         elif period == 'weekly':
             date_format = 'Week %W, %Y'
-            group_by = func.date_trunc('week', Sale.date)
+            sale_group_by = func.date_trunc('week', Sale.date)
+            order_group_by = func.date_trunc('week', Order.order_date)
         else:  # monthly
             date_format = '%Y-%m'
-            group_by = func.date_trunc('month', Sale.date)
+            sale_group_by = func.date_trunc('month', Sale.date)
+            order_group_by = func.date_trunc('month', Order.order_date)
         
-        # Query sales grouped by period
-        sales_data = db.session.query(
-            group_by.label('period'),
+        # Query POS sales
+        pos_sales = db.session.query(
+            sale_group_by.label('period'),
             func.sum(Sale.total).label('total_sales'),
             func.count(Sale.sale_id).label('transaction_count')
-        ).group_by(group_by).order_by(group_by.desc()).limit(limit).all()
+        ).group_by(sale_group_by).order_by(sale_group_by.desc()).limit(limit).all()
         
-        result = []
-        for row in sales_data:
-            result.append({
-                'period': row.period.strftime(date_format) if row.period else None,
-                'total_sales': float(row.total_sales),
-                'transaction_count': row.transaction_count
-            })
+        # Query Online Orders (excluding Cancelled/Rejected)
+        online_orders = db.session.query(
+            order_group_by.label('period'),
+            func.sum(Order.total_amount).label('total_sales'),
+            func.count(Order.order_id).label('transaction_count')
+        ).filter(Order.status.not_in(['Cancelled', 'Rejected']))\
+         .group_by(order_group_by).order_by(order_group_by.desc()).limit(limit).all()
         
-        return jsonify(result), 200
+        # Merge dictionaries
+        merged_data = {}
+        
+        for row in pos_sales:
+            if not row.period: continue
+            period_str = row.period.strftime(date_format)
+            merged_data[period_str] = {
+                'period': period_str,
+                'pos_sales': float(row.total_sales or 0),
+                'pos_count': row.transaction_count,
+                'online_sales': 0.0,
+                'online_count': 0
+            }
+            
+        for row in online_orders:
+            if not row.period: continue
+            period_str = row.period.strftime(date_format)
+            if period_str not in merged_data:
+                merged_data[period_str] = {
+                    'period': period_str,
+                    'pos_sales': 0.0,
+                    'pos_count': 0,
+                    'online_sales': 0.0,
+                    'online_count': 0
+                }
+            merged_data[period_str]['online_sales'] = float(row.total_sales or 0)
+            merged_data[period_str]['online_count'] = row.transaction_count
+            
+        # Convert to list and sort
+        result = list(merged_data.values())
+        # Sort descending by period string (or date logic, but string works for these formats except weekly, but it's close enough)
+        result.sort(key=lambda x: x['period'], reverse=True)
+        
+        return jsonify(result[:limit]), 200
     except Exception as e:
         return jsonify({'message': 'Error retrieving sales summary', 'error': str(e)}), 500
 
@@ -97,28 +135,58 @@ def top_medicines(current_user):
     try:
         limit = int(request.args.get('limit', 10))
         
-        # Query top medicines by sales quantity
-        top_meds = db.session.query(
+        # Query top medicines by POS sales quantity
+        pos_meds = db.session.query(
+            Medicine.medicine_id,
             Medicine.name,
             Company.name.label('company'),
             func.sum(Sale.quantity).label('total_quantity'),
             func.sum(Sale.total).label('total_revenue')
         ).join(Sale, Medicine.medicine_id == Sale.medicine_id)\
          .join(Company, Medicine.company_id == Company.company_id)\
-         .group_by(Medicine.medicine_id, Medicine.name, Company.name)\
-         .order_by(func.sum(Sale.quantity).desc())\
-         .limit(limit).all()
+         .group_by(Medicine.medicine_id, Medicine.name, Company.name).all()
         
-        result = []
-        for row in top_meds:
-            result.append({
+        # Query top medicines by Online Orders (excluding Cancelled/Rejected)
+        online_meds = db.session.query(
+            Medicine.medicine_id,
+            Medicine.name,
+            Company.name.label('company'),
+            func.sum(OrderItem.quantity).label('total_quantity'),
+            func.sum(OrderItem.subtotal).label('total_revenue')
+        ).join(OrderItem, Medicine.medicine_id == OrderItem.medicine_id)\
+         .join(Order, OrderItem.order_id == Order.order_id)\
+         .join(Company, Medicine.company_id == Company.company_id)\
+         .filter(Order.status.not_in(['Cancelled', 'Rejected']))\
+         .group_by(Medicine.medicine_id, Medicine.name, Company.name).all()
+        
+        # Merge the two result sets
+        merged_meds = {}
+        
+        for row in pos_meds:
+            merged_meds[row.medicine_id] = {
                 'medicine_name': row.name,
                 'company': row.company,
-                'total_quantity': int(row.total_quantity),
-                'total_revenue': float(row.total_revenue)
-            })
+                'total_quantity': int(row.total_quantity or 0),
+                'total_revenue': float(row.total_revenue or 0)
+            }
+            
+        for row in online_meds:
+            if row.medicine_id in merged_meds:
+                merged_meds[row.medicine_id]['total_quantity'] += int(row.total_quantity or 0)
+                merged_meds[row.medicine_id]['total_revenue'] += float(row.total_revenue or 0)
+            else:
+                merged_meds[row.medicine_id] = {
+                    'medicine_name': row.name,
+                    'company': row.company,
+                    'total_quantity': int(row.total_quantity or 0),
+                    'total_revenue': float(row.total_revenue or 0)
+                }
+                
+        # Convert to list and sort by total_quantity descending
+        result = list(merged_meds.values())
+        result.sort(key=lambda x: x['total_quantity'], reverse=True)
         
-        return jsonify(result), 200
+        return jsonify(result[:limit]), 200
     except Exception as e:
         return jsonify({'message': 'Error retrieving top medicines', 'error': str(e)}), 500
 
@@ -223,3 +291,15 @@ def export_table(current_user, table):
         }), 200
     except Exception as e:
         return jsonify({'message': 'Error exporting data', 'error': str(e)}), 500
+
+@report_bp.route('/dead-stock', methods=['GET'])
+@token_required
+def get_dead_stock(current_user):
+    try:
+        analyzer = DeadStockAnalyzer(db.session)
+        result = analyzer.analyze_dead_stock()
+        return jsonify(result), 200
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'message': 'Error analyzing dead stock', 'error': str(e)}), 500

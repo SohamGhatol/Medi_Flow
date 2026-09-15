@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { cart } from '../services/customerApi';
+import { useAlert } from '../context/AlertContext';
+import CustomerNavbar from './common/CustomerNavbar';
 
 const ShoppingCart = () => {
+  const { showAlert, showConfirm } = useAlert();
   const [cartItems, setCartItems] = useState([]);
   const [cartSummary, setCartSummary] = useState({
     total: 0,
@@ -27,6 +30,7 @@ const ShoppingCart = () => {
         item_count: response.data.item_count,
         requires_prescription: response.data.requires_prescription
       });
+      window.dispatchEvent(new Event('cartUpdated'));
     } catch (error) {
       console.error('Error fetching cart:', error);
     } finally {
@@ -42,35 +46,39 @@ const ShoppingCart = () => {
       await cart.update(cartItemId, { quantity: newQuantity });
       fetchCart();
     } catch (error) {
-      alert(error.response?.data?.message || 'Failed to update quantity');
+      showAlert({ type: 'error', message: error.response?.data?.message || 'Failed to update quantity', title: 'Error' });
     } finally {
       setUpdating(false);
     }
   };
 
   const handleRemoveItem = async (cartItemId) => {
-    if (!window.confirm('Remove this item from cart?')) return;
+    const confirmed = await showConfirm('Remove this item from cart?', 'Remove Item', 'Remove');
+    if (!confirmed) return;
     
     try {
       setUpdating(true);
       await cart.remove(cartItemId);
+      showAlert({ type: 'success', message: 'Item removed from cart' });
       fetchCart();
     } catch (error) {
-      alert('Failed to remove item');
+      showAlert({ type: 'error', message: 'Failed to remove item', title: 'Error' });
     } finally {
       setUpdating(false);
     }
   };
 
   const handleClearCart = async () => {
-    if (!window.confirm('Clear entire cart?')) return;
+    const confirmed = await showConfirm('Clear entire cart?', 'Clear Cart', 'Clear');
+    if (!confirmed) return;
     
     try {
       setUpdating(true);
       await cart.clear();
+      showAlert({ type: 'success', message: 'Cart cleared' });
       fetchCart();
     } catch (error) {
-      alert('Failed to clear cart');
+      showAlert({ type: 'error', message: 'Failed to clear cart', title: 'Error' });
     } finally {
       setUpdating(false);
     }
@@ -83,36 +91,14 @@ const ShoppingCart = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <Link to="/shop" className="flex items-center">
-                <img 
-                  src="/logo.png" 
-                  alt="Medi-Flow" 
-                  className="h-10 w-auto"
-                  onError={(e) => e.target.style.display = 'none'}
-                />
-                <span className="ml-2 text-xl font-bold text-indigo-600">Medi-Flow</span>
-              </Link>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link to="/shop" className="text-gray-700 hover:text-indigo-600">
-                Continue Shopping
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-slate-50">
+      <CustomerNavbar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Shopping Cart</h1>
@@ -126,7 +112,7 @@ const ShoppingCart = () => {
             <p className="mt-2 text-gray-500">Start shopping to add items to your cart</p>
             <Link
               to="/shop"
-              className="mt-6 inline-block bg-gradient-to-r from-green-500 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-blue-700 transition duration-150"
+              className="mt-6 inline-block bg-accent-600 text-white px-6 py-3 rounded-lg hover:bg-accent-700 transition duration-150"
             >
               Browse Products
             </Link>
@@ -157,10 +143,11 @@ const ShoppingCart = () => {
                   <div className="flex items-center space-x-4">
                     {/* Product Image */}
                     <img
-                      src={item.image_url}
+                      src={item.image_url?.startsWith('/uploads') ? `http://localhost:5000${item.image_url}` : (item.image_url || 'https://via.placeholder.com/100?text=Medicine')}
                       alt={item.name}
                       className="h-24 w-24 object-cover rounded-lg"
                       onError={(e) => {
+                        e.target.onerror = null; // Prevent infinite loop
                         e.target.src = 'https://via.placeholder.com/100?text=Medicine';
                       }}
                     />
@@ -198,7 +185,7 @@ const ShoppingCart = () => {
 
                         {/* Price */}
                         <div className="text-right">
-                          <p className="text-2xl font-bold text-indigo-600">₹{item.price}</p>
+                          <p className="text-2xl font-bold text-primary-600">₹{item.price}</p>
                           <p className="text-sm text-gray-500">per unit</p>
                         </div>
                       </div>
@@ -277,7 +264,7 @@ const ShoppingCart = () => {
                   </div>
                   <div className="border-t pt-3 flex justify-between text-lg font-bold">
                     <span>Total</span>
-                    <span className="text-indigo-600">₹{cartSummary.total.toFixed(2)}</span>
+                    <span className="text-primary-600">₹{cartSummary.total.toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -292,14 +279,14 @@ const ShoppingCart = () => {
                 <button
                   onClick={handleCheckout}
                   disabled={updating}
-                  className="w-full bg-gradient-to-r from-green-500 to-blue-600 text-white py-3 px-4 rounded-lg hover:from-green-600 hover:to-blue-700 transition duration-150 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-accent-600 text-white py-3 px-4 rounded-lg hover:bg-accent-700 transition duration-150 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Proceed to Checkout
                 </button>
 
                 <Link
                   to="/shop"
-                  className="block w-full text-center mt-3 text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                  className="block w-full text-center mt-3 text-primary-600 hover:text-primary-800 text-sm font-medium"
                 >
                   Continue Shopping
                 </Link>

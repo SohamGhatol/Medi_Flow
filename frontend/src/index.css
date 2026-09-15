@@ -16,6 +16,23 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+body.has-sidebar {
+  padding-left: 16rem; /* 64 * 0.25rem = 16rem */
+  transition: padding-left 0.3s ease-in-out;
+}
+
+body.has-sidebar-collapsed {
+  padding-left: 5rem; /* 20 * 0.25rem = 5rem */
+  transition: padding-left 0.3s ease-in-out;
+}
+
+@media (max-width: 1024px) {
+  body.has-sidebar, body.has-sidebar-collapsed {
+    padding-left: 0;
+    padding-top: 4rem; /* Mobile header height */
+  }
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;

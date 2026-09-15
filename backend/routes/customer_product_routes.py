@@ -13,6 +13,7 @@ def get_products():
         # Get query parameters
         search = request.args.get('search', '')
         product_type = request.args.get('type')  # 'OTC' or 'Rx'
+        category = request.args.get('category')
         company_id = request.args.get('company')
         min_price = request.args.get('min_price', type=float)
         max_price = request.args.get('max_price', type=float)
@@ -31,6 +32,7 @@ def get_products():
             query = query.filter(
                 db.or_(
                     Medicine.name.ilike(f'%{search}%'),
+                    Medicine.generic_name.ilike(f'%{search}%'),
                     Company.name.ilike(f'%{search}%'),
                     Medicine.description.ilike(f'%{search}%')
                 )
@@ -38,6 +40,9 @@ def get_products():
         
         if product_type and product_type in ['OTC', 'Rx']:
             query = query.filter(Medicine.product_type == product_type)
+            
+        if category:
+            query = query.filter(Medicine.category == category)
         
         if company_id:
             query = query.filter(Medicine.company_id == company_id)
@@ -65,12 +70,16 @@ def get_products():
             result.append({
                 'medicine_id': med.medicine_id,
                 'name': med.name,
+                'generic_name': med.generic_name,
+                'category': med.category,
+                'dosage_form': med.dosage_form,
+                'strength': med.strength,
                 'company': med.company.name,
                 'company_id': med.company_id,
                 'price': float(med.price),
                 'product_type': med.product_type,
                 'description': med.description,
-                'image_url': med.image_url or '/static/images/medicine-placeholder.png',
+                'image_url': med.image_url,
                 'in_stock': med.quantity > 0,
                 'available_quantity': med.quantity if med.quantity <= 100 else 100,  # Don't show exact high quantities
                 'requires_prescription': med.product_type == 'Rx'
@@ -106,13 +115,17 @@ def get_product_detail(id):
         return jsonify({
             'medicine_id': medicine.medicine_id,
             'name': medicine.name,
+            'generic_name': medicine.generic_name,
+            'category': medicine.category,
+            'dosage_form': medicine.dosage_form,
+            'strength': medicine.strength,
             'company': medicine.company.name,
             'company_id': medicine.company_id,
             'batch_no': medicine.batch_no,
             'price': float(medicine.price),
             'product_type': medicine.product_type,
             'description': medicine.description,
-            'image_url': medicine.image_url or '/static/images/medicine-placeholder.png',
+            'image_url': medicine.image_url,
             'in_stock': is_available,
             'available_quantity': medicine.quantity if medicine.quantity <= 100 else 100,
             'requires_prescription': medicine.product_type == 'Rx',

@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { useAlert } from '../context/AlertContext';
+import StaffNavbar from './common/StaffNavbar';
 
 const MedicineTable = () => {
+  const { showAlert, showConfirm } = useAlert();
   const [medicines, setMedicines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
-  const [deleteModal, setDeleteModal] = useState({ show: false, medicine: null });
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,35 +27,30 @@ const MedicineTable = () => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/');
+  const handleLogout = async () => {
+    const confirmed = await showConfirm('Are you sure you want to logout from Medi-Flow?', 'Confirm Logout', 'Logout');
+    if (confirmed) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      navigate('/');
+    }
   };
 
   const handleEdit = (medicine) => {
     navigate(`/medicines/edit/${medicine.medicine_id}`, { state: { medicine } });
   };
 
-  const handleDeleteClick = (medicine) => {
-    setDeleteModal({ show: true, medicine });
-  };
-
-  const handleDeleteConfirm = async () => {
-    try {
-      await api.delete(`/medicines/${deleteModal.medicine.medicine_id}`);
-      setSuccess('Medicine deleted successfully!');
-      setDeleteModal({ show: false, medicine: null });
-      fetchMedicines();
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to delete medicine');
-      setTimeout(() => setError(''), 3000);
+  const handleDeleteClick = async (medicine) => {
+    const confirmed = await showConfirm(`Are you sure you want to delete ${medicine.name}? This action cannot be undone.`, 'Delete Medicine', 'Delete');
+    if (confirmed) {
+      try {
+        await api.delete(`/medicines/${medicine.medicine_id}`);
+        showAlert({ type: 'success', message: 'Medicine deleted successfully!' });
+        fetchMedicines();
+      } catch (err) {
+        showAlert({ type: 'error', message: err.response?.data?.message || 'Failed to delete medicine', title: 'Error' });
+      }
     }
-  };
-
-  const handleDeleteCancel = () => {
-    setDeleteModal({ show: false, medicine: null });
   };
 
   const filteredMedicines = medicines.filter(medicine => {
@@ -72,59 +67,9 @@ const MedicineTable = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-slate-50">
       {/* Navigation */}
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-indigo-600">MSMS</h1>
-              </div>
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                <button
-                  onClick={() => navigate('/dashboard')}
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  Dashboard
-                </button>
-                <button
-                  onClick={() => navigate('/medicines')}
-                  className="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  Medicines
-                </button>
-                <button
-                  onClick={() => navigate('/sales')}
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  Sales
-                </button>
-                <button
-                  onClick={() => navigate('/reports')}
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  Reports
-                </button>
-                <button
-                  onClick={() => navigate('/admin')}
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  Admin
-                </button>
-              </div>
-            </div>
-            <div className="hidden sm:ml-6 sm:flex sm:items-center">
-              <button
-                onClick={handleLogout}
-                className="ml-3 bg-white rounded-md font-medium text-gray-700 hover:text-gray-900 focus:outline-none"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <StaffNavbar activePage="medicines" />
 
       {/* Main content */}
       <div className="py-10">
@@ -134,7 +79,7 @@ const MedicineTable = () => {
               <h1 className="text-3xl font-bold leading-tight text-gray-900">Medicine Inventory</h1>
               <button
                 onClick={() => navigate('/medicines/add')}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none"
               >
                 Add Medicine
               </button>
@@ -150,14 +95,14 @@ const MedicineTable = () => {
                   <input
                     type="text"
                     placeholder="Search medicines..."
-                    className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
                 <div>
                   <select
-                    className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
                   >
@@ -178,6 +123,9 @@ const MedicineTable = () => {
                           <tr>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Medicine
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Category & Type
                             </th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Company
@@ -205,13 +153,13 @@ const MedicineTable = () => {
                         <tbody className="bg-white divide-y divide-gray-200">
                           {loading ? (
                             <tr>
-                              <td colSpan="8" className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                              <td colSpan="9" className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
                                 Loading medicines...
                               </td>
                             </tr>
                           ) : filteredMedicines.length === 0 ? (
                             <tr>
-                              <td colSpan="8" className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                              <td colSpan="9" className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
                                 No medicines found
                               </td>
                             </tr>
@@ -220,6 +168,13 @@ const MedicineTable = () => {
                               <tr key={medicine.medicine_id}>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm font-medium text-gray-900">{medicine.name}</div>
+                                  {medicine.generic_name && (
+                                    <div className="text-xs text-gray-500">{medicine.generic_name}</div>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">{medicine.category || 'Uncategorized'}</div>
+                                  <div className="text-xs text-gray-500">{medicine.product_type}</div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm text-gray-900">{medicine.company}</div>
@@ -264,7 +219,7 @@ const MedicineTable = () => {
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                   <button
                                     onClick={() => handleEdit(medicine)}
-                                    className="text-indigo-600 hover:text-indigo-900 mr-4"
+                                    className="text-primary-600 hover:text-primary-900 mr-4"
                                   >
                                     <svg className="h-5 w-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -293,75 +248,6 @@ const MedicineTable = () => {
         </main>
       </div>
 
-      {/* Success/Error Messages */}
-      {success && (
-        <div className="fixed top-4 right-4 bg-green-50 border-l-4 border-green-500 p-4 rounded-lg shadow-lg animate-fade-in z-50">
-          <div className="flex">
-            <svg className="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p className="ml-3 text-sm text-green-700">{success}</p>
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div className="fixed top-4 right-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-lg shadow-lg animate-fade-in z-50">
-          <div className="flex">
-            <svg className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p className="ml-3 text-sm text-red-700">{error}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteModal.show && (
-        <div className="fixed z-50 inset-0 overflow-y-auto">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={handleDeleteCancel}></div>
-            
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                  </div>
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">
-                      Delete Medicine
-                    </h3>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500">
-                        Are you sure you want to delete <strong>{deleteModal.medicine?.name}</strong>? This action cannot be undone.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  onClick={handleDeleteConfirm}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
-                >
-                  Delete
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteCancel}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

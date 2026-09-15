@@ -8,6 +8,7 @@ class Company(db.Model):
     name = db.Column(db.String(100), nullable=False)
     contact = db.Column(db.String(50))
     address = db.Column(db.Text)
+    lead_time_days = db.Column(db.Integer, default=5)  # Expected lead time for deliveries
     
     # Relationship
     medicines = db.relationship('Medicine', backref='company', lazy=True)
@@ -28,6 +29,10 @@ class Medicine(db.Model):
     min_stock = db.Column(db.Integer, nullable=False, default=10)
     price = db.Column(db.Numeric(10, 2), nullable=False)
     product_type = db.Column(db.String(10), nullable=False, default='OTC')  # 'OTC' or 'Rx'
+    category = db.Column(db.String(50), default='Uncategorized')
+    generic_name = db.Column(db.String(100))
+    dosage_form = db.Column(db.String(50))
+    strength = db.Column(db.String(50))
     description = db.Column(db.Text)
     image_url = db.Column(db.String(255))
     

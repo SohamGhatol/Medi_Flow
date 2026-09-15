@@ -1,29 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement
-} from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 import { Bar, Pie } from 'react-chartjs-2';
+import api from '../services/api';
+import { useAlert } from '../context/AlertContext';
+import StaffNavbar from './common/StaffNavbar';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
 const Reports = () => {
+  const { showAlert, showConfirm } = useAlert();
   const [salesData, setSalesData] = useState([]);
   const [topMedicines, setTopMedicines] = useState([]);
   const [expiryData, setExpiryData] = useState([]);
@@ -56,24 +42,46 @@ const Reports = () => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/');
+  const handleLogout = async () => {
+    const confirmed = await showConfirm('Are you sure you want to logout from Medi-Flow?', 'Confirm Logout', 'Logout');
+    if (confirmed) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      navigate('/');
+    }
   };
+
+  const totalPosSales = salesData.reduce((acc, curr) => acc + (curr.pos_sales || 0), 0);
+  const totalOnlineSales = salesData.reduce((acc, curr) => acc + (curr.online_sales || 0), 0);
+  const combinedTotal = totalPosSales + totalOnlineSales;
 
   // Chart data for sales
   const salesChartData = {
     labels: salesData.map(item => item.period),
     datasets: [
       {
-        label: 'Sales (₹)',
-        data: salesData.map(item => item.total_sales),
-        backgroundColor: 'rgba(79, 70, 229, 0.5)',
+        label: 'In-Store POS (₹)',
+        data: salesData.map(item => item.pos_sales),
+        backgroundColor: 'rgba(79, 70, 229, 0.7)',
         borderColor: 'rgba(79, 70, 229, 1)',
         borderWidth: 1,
       },
+      {
+        label: 'Online Orders (₹)',
+        data: salesData.map(item => item.online_sales),
+        backgroundColor: 'rgba(16, 185, 129, 0.7)',
+        borderColor: 'rgba(16, 185, 129, 1)',
+        borderWidth: 1,
+      }
     ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    scales: {
+      x: { stacked: true },
+      y: { stacked: true }
+    }
   };
 
   // Chart data for top medicines
@@ -118,64 +126,14 @@ const Reports = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting data:', error);
-      alert('Failed to export data');
+      showAlert({ type: 'error', message: 'Failed to export data', title: 'Error' });
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-slate-50">
       {/* Navigation */}
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-indigo-600">MSMS</h1>
-              </div>
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                <button
-                  onClick={() => navigate('/dashboard')}
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  Dashboard
-                </button>
-                <button
-                  onClick={() => navigate('/medicines')}
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  Medicines
-                </button>
-                <button
-                  onClick={() => navigate('/sales')}
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  Sales
-                </button>
-                <button
-                  onClick={() => navigate('/reports')}
-                  className="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  Reports
-                </button>
-                <button
-                  onClick={() => navigate('/admin')}
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  Admin
-                </button>
-              </div>
-            </div>
-            <div className="hidden sm:ml-6 sm:flex sm:items-center">
-              <button
-                onClick={handleLogout}
-                className="ml-3 bg-white rounded-md font-medium text-gray-700 hover:text-gray-900 focus:outline-none"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <StaffNavbar activePage="reports" />
 
       {/* Main content */}
       <div className="py-10">
@@ -187,7 +145,7 @@ const Reports = () => {
                 <select
                   value={period}
                   onChange={(e) => setPeriod(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
                 >
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
@@ -195,13 +153,13 @@ const Reports = () => {
                 </select>
                 <button
                   onClick={() => handleExport('sales')}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   Export Sales
                 </button>
                 <button
                   onClick={() => handleExport('medicines')}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   Export Medicines
                 </button>
@@ -214,11 +172,27 @@ const Reports = () => {
             <div className="px-4 py-6 sm:px-0">
               {loading ? (
                 <div className="text-center py-10">
-                  <div className="spinner-border animate-spin inline-block w-8 h-8 border-4 rounded-full text-indigo-600 border-t-transparent"></div>
+                  <div className="spinner-border animate-spin inline-block w-8 h-8 border-4 rounded-full text-primary-600 border-t-transparent"></div>
                   <p className="mt-2 text-gray-600">Loading reports...</p>
                 </div>
               ) : (
                 <div className="space-y-8">
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div className="bg-white rounded-xl shadow p-6 border border-slate-100">
+                      <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">In-Store Revenue</p>
+                      <h3 className="text-2xl font-black text-indigo-600 mt-2">₹{totalPosSales.toFixed(2)}</h3>
+                    </div>
+                    <div className="bg-white rounded-xl shadow p-6 border border-slate-100">
+                      <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Online Revenue</p>
+                      <h3 className="text-2xl font-black text-emerald-600 mt-2">₹{totalOnlineSales.toFixed(2)}</h3>
+                    </div>
+                    <div className="bg-slate-900 rounded-xl shadow p-6 border border-slate-800">
+                      <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">Total Combined Revenue</p>
+                      <h3 className="text-3xl font-black text-white mt-2">₹{combinedTotal.toFixed(2)}</h3>
+                    </div>
+                  </div>
+
                   {/* Sales Chart */}
                   <div className="bg-white shadow overflow-hidden sm:rounded-lg">
                     <div className="px-4 py-5 sm:px-6">
@@ -226,7 +200,7 @@ const Reports = () => {
                       <p className="mt-1 max-w-2xl text-sm text-gray-500">Sales trends over time</p>
                     </div>
                     <div className="px-4 py-5 sm:p-6">
-                      <Bar data={salesChartData} />
+                      <Bar data={salesChartData} options={chartOptions} />
                     </div>
                   </div>
 

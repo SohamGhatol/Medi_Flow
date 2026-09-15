@@ -36,6 +36,8 @@ def customer_token_required(f):
     
     return decorated
 
+import re
+
 @customer_auth_bp.route('/register', methods=['POST'])
 def register():
     """Customer registration"""
@@ -45,24 +47,52 @@ def register():
         # Validate required fields
         required_fields = ['name', 'email', 'phone', 'password', 'address']
         for field in required_fields:
-            if field not in data or not data[field]:
+            if field not in data or not str(data[field]).strip():
                 return jsonify({'message': f'Missing required field: {field}'}), 400
         
+        name = data['name'].strip()
+        email = data['email'].strip().lower()
+        phone = data['phone'].strip()
+        password = data['password']
+        address = data['address'].strip()
+        pincode = str(data.get('pincode', '')).strip() if data.get('pincode') else None
+
+        # Length and Format Validations
+        if len(name) < 2 or len(name) > 100:
+            return jsonify({'message': 'Name must be between 2 and 100 characters'}), 400
+            
+        if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
+            return jsonify({'message': 'Invalid email format'}), 400
+            
+        if not re.match(r'^[6-9]\d{9}$', phone) and not re.match(r'^\d{10}$', phone):
+            return jsonify({'message': 'Please enter a valid 10-digit mobile number'}), 400
+            
+        if pincode and not re.match(r'^\d{6}$', pincode):
+            return jsonify({'message': 'Please enter a valid 6-digit pincode'}), 400
+            
+        # Password Strength Validation
+        if (len(password) < 8 or 
+            not re.search(r'[A-Z]', password) or 
+            not re.search(r'[a-z]', password) or 
+            not re.search(r'\d', password) or 
+            not re.search(r'[^A-Za-z0-9]', password)):
+            return jsonify({'message': 'Password must be at least 8 characters and contain uppercase, lowercase, number, and special character'}), 400
+
         # Check if email already exists
-        if Customer.query.filter_by(email=data['email']).first():
-            return jsonify({'message': 'Email already registered'}), 400
+        if Customer.query.filter_by(email=email).first():
+            return jsonify({'message': 'An account with this email already exists. Please sign in instead.'}), 409
         
         # Create new customer
         new_customer = Customer(
-            name=data['name'],
-            email=data['email'].lower(),
-            phone=data['phone'],
-            address=data['address'],
-            city=data.get('city'),
-            state=data.get('state'),
-            pincode=data.get('pincode')
+            name=name,
+            email=email,
+            phone=phone,
+            address=address,
+            city=str(data.get('city', '')).strip() if data.get('city') else None,
+            state=str(data.get('state', '')).strip() if data.get('state') else None,
+            pincode=pincode
         )
-        new_customer.set_password(data['password'])
+        new_customer.set_password(password)
         
         db.session.add(new_customer)
         db.session.commit()
@@ -82,16 +112,19 @@ def login():
     try:
         data = request.get_json()
         
-        if not data.get('email') or not data.get('password'):
-            return jsonify({'message': 'Email and password required'}), 400
+        email = str(data.get('email', '')).strip().lower()
+        password = data.get('password')
         
-        customer = Customer.query.filter_by(email=data['email'].lower()).first()
+        if not email or not password:
+            return jsonify({'message': 'Invalid email or password'}), 400
         
-        if not customer or not customer.check_password(data['password']):
+        customer = Customer.query.filter_by(email=email).first()
+        
+        if not customer or not customer.check_password(password):
             return jsonify({'message': 'Invalid email or password'}), 401
         
         if not customer.is_active:
-            return jsonify({'message': 'Account is inactive'}), 401
+            return jsonify({'message': 'Your account is currently unavailable. Please contact support.'}), 401
         
         # Generate JWT token
         token = jwt.encode({
@@ -116,7 +149,7 @@ def login():
         }), 200
         
     except Exception as e:
-        return jsonify({'message': 'Login failed', 'error': str(e)}), 500
+        return jsonify({'message': 'Login failed. Please try again later.'}), 500
 
 @customer_auth_bp.route('/profile', methods=['GET'])
 @customer_token_required

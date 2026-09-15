@@ -12,6 +12,8 @@ class Purchase(db.Model):
     total = db.Column(db.Numeric(10, 2), nullable=False)
     invoice_no = db.Column(db.String(50), nullable=False)
     date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    status = db.Column(db.String(50), nullable=False, default='Received') # 'Pending', 'Received', 'Cancelled'
+    expected_date = db.Column(db.DateTime, nullable=True)
     
     # Relationship
     medicine = db.relationship('Medicine', backref='purchases', lazy=True)
