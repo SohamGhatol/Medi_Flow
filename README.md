@@ -65,9 +65,15 @@ npm start
 - ✅ **Prescription Review** - Staff can view and approve/reject prescriptions directly
 
 #### Staff Portal Enhancements:
-- ✅ **Online Orders View** - Manage all customer orders in one place
-- ✅ **Prescription Image Viewer** - View uploaded prescriptions directly on website
-- ✅ **Order Status Management** - Update order status (Processing, Out for Delivery, Delivered)
+- ✅ **Demand Analytics Dashboard** - Interactive medicine demand heatmap (day of week / hour of day), trend charting, and spike detection.
+- ✅ **Expiry Intelligence & FEFO** - Automated batch tracking, near-expiry alerts, and First-Expire-First-Out (FEFO) dispensing logic.
+- ✅ **Admin Panel Redesign** - Stunning gradient headers, tabbed navigation, and modern card-based lists.
+- ✅ **Smart Side Navigation** - Converted top navigation into a collapsible, responsive side menu for better space utilization.
+- ✅ **Currency Standardization** - Replaced all $ symbols with ₹ (Indian Rupee) across the entire application.
+- ✅ **Embedded Point of Sale** - Full POS checkout directly embedded at the bottom of the Dashboard for instant access.
+- ✅ **Inline Order Status Update** - Seamless inline dropdown with custom 10-char limits right inside the Orders table.
+- ✅ **Online Orders View** - Manage all customer orders in one place.
+- ✅ **Prescription Image Viewer** - View uploaded prescriptions directly on website.
 - ✅ **Filter & Search** - Filter by status, needs review, etc.
 
 #### Chatbot 2.0 - AI-First Conversational Assistant:
@@ -99,6 +105,8 @@ npm start
   │   ├─ Sales & Billing
   │   ├─ Online Orders Management
   │   ├─ Prescription Review
+  │   ├─ Demand Analytics Heatmap
+  │   ├─ Expiry Intelligence Dashboard
   │   ├─ Reports & Analytics
   │   └─ Chatbot Widget
   │
@@ -168,15 +176,14 @@ npm start
 | --------------------------- | --------------------------- | ---------------------------------------------------------------- |
 | **Staff Authentication**    | Secure login using JWT      | Role-based access (Admin, Manager, Staff), hashed passwords      |
 | **Medicine Management**     | Central medicine inventory  | **Full CRUD operations**, Add/Edit/Delete, batch tracking, expiry alerts, low-stock alerts |
-| **Online Orders View**      | Manage customer orders      | **View all orders**, filter by status, needs review, prescription review |
+| **Online Orders View**      | Manage customer orders      | **View all orders**, inline status updates with custom messaging, prescription review |
 | **Prescription Review**     | Approve/reject prescriptions| **View prescription images directly**, approve/reject with notes |
-| **Order Status Management** | Update order progress       | Change status (Processing, Out for Delivery, Delivered), add notes |
-| **Sales Management**        | In-store billing            | Auto stock update, customer tracking, PDF invoices               |
+| **Sales Management (POS)**  | In-store billing            | **Dashboard Embedded POS**, auto stock update, PDF invoices |
 | **Purchase Management**     | Supplier purchase orders    | Supplier info, invoice upload, automatic stock updates           |
 | **Company Management**      | Pharmaceutical company data | Auto-create on medicine add, CRUD company profiles, contact info |
-| **Reports & Dashboard**     | Analytics and summaries     | Daily sales, top medicines, expiry list, financial reports, interactive charts |
+| **Reports & Dashboard**     | Analytics and summaries     | Daily sales, top medicines, interactive charts, **Embedded Quick POS** |
 | **AI Chatbot (Expert System)** | Intelligent medical assistant | **Quick action buttons**, formatted responses, dosage info, side effects, drug interactions |
-| **User & Role Management**  | Admin control               | Add/remove users, assign roles, view logs                        |
+| **User & Role Management**  | Admin control               | Add/remove users, modern list UI, assign roles, view logs |
 
 ### 🎨 UI/UX Features
 
@@ -685,4 +692,5 @@ Developed with ❤️ for pharmacy management and academic excellence
 
 ---
 
-**© 2025 Medi-Flow Systems. All rights reserved.**
+**© 2025 Medi-Flow Systems. All rights reserved.**#   M e d i _ F l o w  
+ 
