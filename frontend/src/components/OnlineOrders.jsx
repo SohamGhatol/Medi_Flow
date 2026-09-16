@@ -216,7 +216,8 @@ const OnlineOrders = () => {
     <div className="min-h-screen bg-slate-50">
       <StaffNavbar activePage="online-orders" />
       <div className="p-6">
-      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="mb-6 flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Online Customer Orders</h2>
           <p className="mt-1 text-sm text-slate-500">
@@ -275,7 +276,8 @@ const OnlineOrders = () => {
               </button>
             )}
           </div>
-          
+          </div>
+        </div>
         
         {/* Filters */}
         <div className="flex flex-wrap gap-2">
@@ -319,7 +321,6 @@ const OnlineOrders = () => {
           >
             Delivered
           </button>
-        </div>
         </div>
       </div>
 

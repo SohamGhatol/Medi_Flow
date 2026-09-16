@@ -18,6 +18,10 @@ const DeadStockAnalytics = () => {
     fetchData();
   }, []);
 
+  /**
+   * Fetches the dead stock analytics data from the backend API.
+   * Updates both the summary (high-level metrics) and items (detailed list).
+   */
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -31,6 +35,10 @@ const DeadStockAnalytics = () => {
     }
   };
 
+  /**
+   * Memoized filtered list of items based on search term and classification dropdown.
+   * Helps maintain performance when rendering large inventory lists.
+   */
   const filteredItems = useMemo(() => {
     return data.items.filter(item => {
       const matchesSearch = item.medicine_name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -39,13 +47,20 @@ const DeadStockAnalytics = () => {
     });
   }, [data.items, searchTerm, classificationFilter]);
 
+  /**
+   * Helper function to determine the color of the risk score bubble.
+   * Higher scores represent higher financial risk or immediate expiry risk.
+   */
   const getRiskColor = (score) => {
-    if (score >= 90) return 'text-red-600 bg-red-100';
-    if (score >= 70) return 'text-orange-600 bg-orange-100';
-    if (score >= 40) return 'text-yellow-600 bg-yellow-100';
-    return 'text-emerald-600 bg-emerald-100';
+    if (score >= 90) return 'text-red-600 bg-red-100';      // Critical risk (Dead Stock / Expired)
+    if (score >= 70) return 'text-orange-600 bg-orange-100'; // High risk (Slow moving / Expiry soon)
+    if (score >= 40) return 'text-yellow-600 bg-yellow-100'; // Moderate risk
+    return 'text-emerald-600 bg-emerald-100';                // Healthy / Normal
   };
 
+  /**
+   * Helper function to style the classification badge based on inventory status.
+   */
   const getClassificationColor = (classification) => {
     if (classification.includes('DEAD STOCK')) return 'bg-red-100 text-red-800 border-red-200';
     if (classification.includes('SLOW MOVING')) return 'bg-orange-100 text-orange-800 border-orange-200';
@@ -68,7 +83,11 @@ const DeadStockAnalytics = () => {
         </button>
       </div>
 
-      {/* Summary Cards */}
+      {/* 
+        Summary Cards: 
+        Display high-level metrics aggregated across the entire inventory 
+        (e.g., total items that are dead stock, total value tied up in dead stock).
+      */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
           <div className="flex items-center justify-between">

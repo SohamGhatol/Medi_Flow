@@ -14,7 +14,7 @@ import AdminPanel from './components/AdminPanel';
 import ExpiryDashboard from './components/ExpiryDashboard';
 import SmartReplenishment from './components/SmartReplenishment';
 import DemandAnalytics from './components/DemandAnalytics';
-import DeadStockAnalytics from './components/DeadStockAnalytics';
+// import DeadStockAnalytics from './components/DeadStockAnalytics';
 
 // Customer Portal Components
 import DualLoginPage from './components/DualLoginPage';
@@ -56,7 +56,7 @@ function App() {
             <Route path="/expiry-intelligence" element={<ExpiryDashboard />} />
             <Route path="/smart-replenishment" element={<SmartReplenishment />} />
             <Route path="/demand-analytics" element={<DemandAnalytics />} />
-            <Route path="/dead-stock" element={<DeadStockAnalytics />} />
+            {/* <Route path="/dead-stock" element={<DeadStockAnalytics />} /> */}
             
             {/* Customer Portal Routes */}
             <Route path="/customer/login" element={<CustomerLogin />} />

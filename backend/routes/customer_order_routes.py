@@ -4,7 +4,7 @@ from models.medicine import Medicine
 from models.order import Order, OrderItem, OrderStatusHistory
 from ocr_engine import process_prescription_ocr
 from routes.customer_auth_routes import customer_token_required
-from services.inventory_service import InventoryService
+from services.inventory_service import InventoryService, InsufficientStockError
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import os
@@ -169,9 +169,19 @@ def place_order(current_customer):
                 product_type=item_data['product_type']
             )
             db.session.add(order_item)
+            db.session.flush() # Get order_item_id
             
-            # Reduce stock
-            item_data['medicine'].quantity -= item_data['quantity']
+            # Reduce stock using FEFO batch allocation
+            try:
+                InventoryService.allocate_stock_fefo(
+                    medicine_id=item_data['medicine'].medicine_id,
+                    requested_qty=item_data['quantity'],
+                    allocation_type='order',
+                    reference_id=order_item.order_item_id
+                )
+            except InsufficientStockError as e:
+                db.session.rollback()
+                return jsonify({'message': f"Insufficient stock for {item_data['medicine'].name}"}), 400
         
         # Create status history
         status_history = OrderStatusHistory(
