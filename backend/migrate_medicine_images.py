@@ -22,13 +22,16 @@ CATEGORY_COLORS = {
 
 def generate_svg(name, category):
     color = CATEGORY_COLORS.get(category, '#64748b')
-    initials = "".join([w[0].upper() for w in name.split()[:2] if w.isalpha()]) or "Rx"
+    # Split name into multiple lines if it's too long
+    words = name.split()
+    line1 = " ".join(words[:2])
+    line2 = " ".join(words[2:]) if len(words) > 2 else ""
     
     return f"""<svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
   <rect width="400" height="400" rx="40" fill="{color}" opacity="0.1" />
   <rect x="50" y="50" width="300" height="300" rx="30" fill="{color}" opacity="0.2" />
   
-  <g transform="translate(200, 180)">
+  <g transform="translate(200, 150)">
     <!-- Pill body -->
     <rect x="-60" y="-30" width="120" height="60" rx="30" fill="{color}" />
     <!-- Pill highlight -->
@@ -37,10 +40,13 @@ def generate_svg(name, category):
   </g>
   
   <!-- Text -->
-  <text x="200" y="270" font-family="system-ui, -apple-system, sans-serif" font-weight="bold" font-size="28" fill="{color}" text-anchor="middle" letter-spacing="1">
-    {initials}
+  <text x="200" y="240" font-family="system-ui, -apple-system, sans-serif" font-weight="bold" font-size="24" fill="{color}" text-anchor="middle">
+    {line1}
   </text>
-  <text x="200" y="310" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="{color}" text-anchor="middle" opacity="0.8">
+  <text x="200" y="275" font-family="system-ui, -apple-system, sans-serif" font-weight="bold" font-size="20" fill="{color}" text-anchor="middle">
+    {line2}
+  </text>
+  <text x="200" y="320" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="{color}" text-anchor="middle" opacity="0.8">
     {category}
   </text>
 </svg>"""

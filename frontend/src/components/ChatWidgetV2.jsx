@@ -25,8 +25,13 @@ const ChatWidgetV2 = () => {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const dragStart = useRef({ x: 0, y: 0, originX: 0, originY: 0 });
+  const wasDragged = useRef(false);
 
   // Get customer token and ID from localStorage
   const getCustomerAuth = () => {
@@ -43,6 +48,33 @@ const ChatWidgetV2 = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isDragging) return;
+      wasDragged.current = true;
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      setPosition({
+        x: dragStart.current.originX + dx,
+        y: dragStart.current.originY + dy
+      });
+    };
+    
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
 
   const formatBotResponse = (text) => {
     const lines = text.split('\n');
@@ -361,10 +393,27 @@ const ChatWidgetV2 = () => {
       {/* Chat Button */}
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 w-16 h-16 bg-primary-600 rounded-full shadow-lg hover:bg-primary-700 hover:shadow-xl transition-all duration-300 flex items-center justify-center z-50 group"
+          onMouseDown={(e) => {
+            setIsDragging(true);
+            wasDragged.current = false;
+            dragStart.current = {
+              x: e.clientX,
+              y: e.clientY,
+              originX: position.x,
+              originY: position.y
+            };
+          }}
+          onClick={(e) => {
+            if (wasDragged.current) {
+              e.preventDefault();
+              return;
+            }
+            setIsOpen(true);
+          }}
+          style={{ transform: `translate(${position.x}px, ${position.y}px)`, cursor: isDragging ? 'grabbing' : 'pointer' }}
+          className="fixed bottom-6 right-6 w-16 h-16 bg-primary-600 rounded-full shadow-lg hover:bg-primary-700 hover:shadow-xl transition-all duration-300 flex items-center justify-center z-50 group select-none"
         >
-          <svg className="w-8 h-8 text-white group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-8 h-8 text-white group-hover:scale-110 transition-transform pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
           </svg>
         </button>

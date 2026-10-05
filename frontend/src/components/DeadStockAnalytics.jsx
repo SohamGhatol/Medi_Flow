@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
 import { 
   AlertTriangle, Search, Filter, Calendar, TrendingDown,
-  PackageX, DollarSign, Clock, ShieldAlert, X
+  PackageX, IndianRupee, Clock, ShieldAlert, X
 } from 'lucide-react';
 import { useAlert } from '../context/AlertContext';
 
@@ -106,7 +106,7 @@ const DeadStockAnalytics = () => {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
           <div className="flex items-center justify-between">
             <h3 className="text-slate-500 text-sm font-medium">Value At Risk</h3>
-            <div className="p-2 bg-slate-50 text-slate-600 rounded-lg"><DollarSign size={20}/></div>
+            <div className="p-2 bg-slate-50 text-slate-600 rounded-lg"><IndianRupee size={20}/></div>
           </div>
           <p className="text-2xl font-bold text-slate-800 mt-2">
             ₹{data.summary.inventory_value_at_risk?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0.00'}

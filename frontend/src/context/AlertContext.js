@@ -42,12 +42,11 @@ export const AlertProvider = ({ children }) => {
     const id = Date.now() + Math.random().toString();
     setAlerts((prev) => [...prev, { ...alertConfig, id }]);
     
-    // Auto-dismiss after 5 seconds if not error
-    if (alertConfig.type !== 'error') {
-      setTimeout(() => {
-        removeAlert(id);
-      }, 5000);
-    }
+    // Auto-dismiss after a set time (longer for errors)
+    const duration = alertConfig.type === 'error' ? 8000 : 5000;
+    setTimeout(() => {
+      removeAlert(id);
+    }, duration);
   }, []);
 
   const removeAlert = useCallback((id) => {

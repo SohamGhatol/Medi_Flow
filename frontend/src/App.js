@@ -14,7 +14,7 @@ import AdminPanel from './components/AdminPanel';
 import ExpiryDashboard from './components/ExpiryDashboard';
 import SmartReplenishment from './components/SmartReplenishment';
 import DemandAnalytics from './components/DemandAnalytics';
-// import DeadStockAnalytics from './components/DeadStockAnalytics';
+import DeadStockAnalytics from './components/DeadStockAnalytics';
 
 // Customer Portal Components
 import DualLoginPage from './components/DualLoginPage';
@@ -23,6 +23,7 @@ import CustomerRegister from './components/CustomerRegister';
 import ProductCatalog from './components/ProductCatalog';
 import ShoppingCart from './components/ShoppingCart';
 import Checkout from './components/Checkout';
+import ProductDetails from './components/ProductDetails';
 import OrderConfirmation from './components/OrderConfirmation';
 import CustomerDashboard from './components/CustomerDashboard';
 import OrderTracking from './components/OrderTracking';
@@ -56,12 +57,13 @@ function App() {
             <Route path="/expiry-intelligence" element={<ExpiryDashboard />} />
             <Route path="/smart-replenishment" element={<SmartReplenishment />} />
             <Route path="/demand-analytics" element={<DemandAnalytics />} />
-            {/* <Route path="/dead-stock" element={<DeadStockAnalytics />} /> */}
+            <Route path="/dead-stock" element={<DeadStockAnalytics />} />
             
             {/* Customer Portal Routes */}
             <Route path="/customer/login" element={<CustomerLogin />} />
             <Route path="/customer/register" element={<CustomerRegister />} />
             <Route path="/shop" element={<ProductCatalog />} />
+            <Route path="/product/:id" element={<ProductDetails />} />
             <Route path="/cart" element={<ShoppingCart />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/order-confirmation" element={<OrderConfirmation />} />

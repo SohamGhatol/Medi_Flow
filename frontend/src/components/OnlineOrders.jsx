@@ -21,6 +21,7 @@ const OnlineOrders = () => {
   const [customStatus, setCustomStatus] = useState(''); // tracks order_id during async actions
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [otpErrorModal, setOtpErrorModal] = useState(null);
   
   // Debounce search
   useEffect(() => {
@@ -163,12 +164,20 @@ const OnlineOrders = () => {
       return;
     }
 
+    let otp = null;
+    if (finalStatus === 'Delivered') {
+      otp = await showPrompt('Please enter the 4-digit Delivery OTP provided by the customer:', 'Verify Delivery OTP');
+      if (!otp) {
+        return; // User cancelled the prompt
+      }
+    }
+
     try {
       setActionLoading(orderId);
       const token = localStorage.getItem('token');
       await axios.put(
         `${API_URL}/staff/online-orders/${orderId}/status`,
-        { status: finalStatus },
+        { status: finalStatus, otp: otp },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
@@ -177,9 +186,30 @@ const OnlineOrders = () => {
       setEditingOrderId(null);
     } catch (err) {
       console.error('Error updating order status:', err);
-      showAlert({ type: 'error', message: 'Error updating order status', title: 'Error' });
+      if (err.response?.data?.code === 'INVALID_OTP') {
+        setOtpErrorModal(orderId);
+      } else {
+        showAlert({ type: 'error', message: err.response?.data?.message || 'Error updating order status', title: 'Error' });
+      }
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleRegenerateOtp = async (orderId) => {
+    try {
+      setOtpErrorModal(null);
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${API_URL}/staff/online-orders/${orderId}/regenerate-otp`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      showAlert({ type: 'success', message: 'OTP Regenerated successfully', title: 'Success' });
+      submitInlineStatus(orderId);
+    } catch (err) {
+      console.error('Error regenerating OTP:', err);
+      showAlert({ type: 'error', message: err.response?.data?.message || 'Error regenerating OTP', title: 'Error' });
     }
   };
 
@@ -694,6 +724,42 @@ const OnlineOrders = () => {
           </div>
         </div>
       )}
+      
+      {/* OTP Error Modal */}
+      {otpErrorModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Incorrect OTP</h3>
+              <p className="text-slate-600">The PIN you entered is invalid. Please try again or generate a new PIN if the customer hasn't received it.</p>
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+              <button
+                onClick={() => {
+                  const orderId = otpErrorModal;
+                  setOtpErrorModal(null);
+                  submitInlineStatus(orderId);
+                }}
+                className="flex-1 bg-white border border-slate-300 text-slate-700 py-2.5 rounded-lg hover:bg-slate-100 font-semibold transition-colors"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => handleRegenerateOtp(otpErrorModal)}
+                className="flex-1 bg-primary-600 text-white py-2.5 rounded-lg hover:bg-primary-700 font-semibold transition-colors shadow-sm"
+              >
+                Regenerate OTP
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       </div>
     </div>
   );

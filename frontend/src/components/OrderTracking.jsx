@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { orders } from '../services/customerApi';
+import { RefreshCw } from 'lucide-react';
 
 const OrderTracking = () => {
   const { orderId } = useParams();
@@ -70,6 +71,22 @@ const OrderTracking = () => {
             <p className="text-gray-600">
               Last updated: {new Date(trackingData.last_updated).toLocaleString()}
             </p>
+            {trackingData.delivery_otp && !['Delivered', 'Cancelled', 'Rejected'].includes(trackingData.current_status) && (
+              <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl inline-block">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm text-yellow-800 font-medium">Delivery OTP</p>
+                  <button 
+                    onClick={() => fetchTracking()}
+                    className="p-1 text-yellow-600 hover:text-yellow-800 hover:bg-yellow-100 rounded-full transition-colors"
+                    title="Refresh PIN"
+                  >
+                    <RefreshCw size={16} />
+                  </button>
+                </div>
+                <p className="text-3xl font-black text-yellow-600 tracking-widest">{trackingData.delivery_otp}</p>
+                <p className="text-xs text-yellow-600 mt-2">Share this with the delivery executive.</p>
+              </div>
+            )}
           </div>
         </div>
 

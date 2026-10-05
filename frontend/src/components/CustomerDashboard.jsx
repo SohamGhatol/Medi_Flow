@@ -3,6 +3,7 @@ import { useNavigate, Link, useParams } from 'react-router-dom';
 import { orders } from '../services/customerApi';
 import { useAlert } from '../context/AlertContext';
 import CustomerNavbar from './common/CustomerNavbar';
+import { RefreshCw } from 'lucide-react';
 
 const CustomerDashboard = () => {
   const { showConfirm } = useAlert();
@@ -198,9 +199,24 @@ const CustomerDashboard = () => {
                           Placed on {new Date(selectedOrder.order_date).toLocaleDateString()}
                         </p>
                       </div>
-                      <span className={`px-4 py-1.5 rounded-full text-sm font-bold tracking-wide ${getStatusColor(selectedOrder.status)}`}>
-                        {selectedOrder.status}
-                      </span>
+                      <div className="flex items-center gap-4">
+                        {selectedOrder.delivery_otp && !['Delivered', 'Cancelled', 'Rejected'].includes(selectedOrder.status) && (
+                          <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 px-3 py-1.5 rounded-lg">
+                            <span className="text-xs font-bold text-yellow-700 uppercase tracking-wider">PIN:</span>
+                            <span className="text-lg font-black text-yellow-600 tracking-widest">{selectedOrder.delivery_otp}</span>
+                            <button 
+                              onClick={() => fetchOrderDetails(selectedOrder.order_id)}
+                              className="ml-2 p-1 text-yellow-600 hover:text-yellow-800 hover:bg-yellow-100 rounded-full transition-colors"
+                              title="Refresh PIN"
+                            >
+                              <RefreshCw size={16} className={loadingDetails ? "animate-spin" : ""} />
+                            </button>
+                          </div>
+                        )}
+                        <span className={`px-4 py-1.5 rounded-full text-sm font-bold tracking-wide ${getStatusColor(selectedOrder.status)}`}>
+                          {selectedOrder.status}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

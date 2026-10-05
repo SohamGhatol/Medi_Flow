@@ -33,6 +33,9 @@ class Order(db.Model):
     # Timestamps
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Delivery OTP
+    delivery_otp = db.Column(db.String(4))
+    
     # Relationships
     order_items = db.relationship('OrderItem', backref='order', lazy=True, cascade='all, delete-orphan')
     status_history = db.relationship('OrderStatusHistory', backref='order', lazy=True, cascade='all, delete-orphan')

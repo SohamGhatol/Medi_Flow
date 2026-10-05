@@ -236,7 +236,8 @@ def get_orders(current_customer):
                 'payment_method': order.payment_method,
                 'item_count': len(order.order_items),
                 'requires_prescription': order.requires_prescription,
-                'prescription_status': order.prescription_status
+                'prescription_status': order.prescription_status,
+            'delivery_otp': order.delivery_otp,
             })
         
         return jsonify(result), 200
@@ -286,6 +287,7 @@ def get_order_details(current_customer, order_id):
             'requires_prescription': order.requires_prescription,
             'prescription_uploaded': order.prescription_uploaded,
             'prescription_status': order.prescription_status,
+            'delivery_otp': order.delivery_otp,
             'items': items,
             'history': history
         }), 200

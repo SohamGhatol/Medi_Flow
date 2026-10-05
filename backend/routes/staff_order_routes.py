@@ -7,6 +7,7 @@ from models.prescription_ocr import PrescriptionOCRResult, PrescriptionMedicineE
 from routes.auth_routes import token_required, role_required
 from datetime import datetime
 import os
+import random
 
 staff_order_bp = Blueprint('staff_orders', __name__)
 
@@ -339,10 +340,18 @@ def update_order_status(current_user, order_id):
         # Prevent status change if prescription pending
         if order.requires_prescription and order.prescription_status == 'Pending' and data['status'] not in ['Rejected', 'Cancelled']:
             return jsonify({'message': 'Cannot update status until prescription is reviewed'}), 400
+            
+        if data['status'] == 'Delivered':
+            provided_otp = data.get('otp')
+            if not provided_otp or provided_otp != order.delivery_otp:
+                return jsonify({'message': 'Invalid OTP', 'code': 'INVALID_OTP'}), 400
         
         old_status = order.status
         order.status = data['status']
         
+        if order.status == 'Out for Delivery' and old_status != 'Out for Delivery':
+            order.delivery_otp = str(random.randint(1000, 9999))
+            
         notes = data.get('notes', f'Status changed from {old_status} to {data["status"]}')
         
         # Add to status history
@@ -432,3 +441,23 @@ def get_order_stats(current_user):
         
     except Exception as e:
         return jsonify({'message': 'Error retrieving stats', 'error': str(e)}), 500
+
+@staff_order_bp.route('/online-orders/<int:order_id>/regenerate-otp', methods=['POST'])
+@token_required
+def regenerate_order_otp(current_user, order_id):
+    """Regenerate delivery OTP"""
+    try:
+        order = Order.query.get(order_id)
+        if not order:
+            return jsonify({'message': 'Order not found'}), 404
+            
+        if order.status != 'Out for Delivery':
+            return jsonify({'message': 'Order is not Out for Delivery'}), 400
+            
+        order.delivery_otp = str(random.randint(1000, 9999))
+        db.session.commit()
+        
+        return jsonify({'message': 'OTP regenerated successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': 'Error regenerating OTP', 'error': str(e)}), 500

@@ -411,7 +411,7 @@ const ProductCatalog = () => {
 
             {/* Pagination Controls */}
             {pagination.pages > 1 && (
-              <div className="mt-10 flex items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6 rounded-2xl shadow-sm border">
+              <div className="mt-10 sticky bottom-4 z-40 flex items-center justify-between border border-slate-200 bg-white px-4 py-3 sm:px-6 rounded-2xl shadow-xl">
                 <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm text-slate-700">

@@ -109,7 +109,7 @@ const ExpiryDashboard = () => {
             <DollarSign className="text-gray-500 w-5 h-5" />
           </div>
           <p className="text-2xl font-bold text-red-600 mt-2">
-            ${data.metrics.total_value_at_risk.toFixed(2)}
+            ₹{data.metrics.total_value_at_risk.toFixed(2)}
           </p>
         </div>
       </div>
